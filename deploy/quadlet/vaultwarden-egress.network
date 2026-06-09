@@ -1,0 +1,16 @@
+[Unit]
+Description=Vaultwarden egress network (allowlist proxy -> Entra only)
+
+[Network]
+NetworkName=vaultwarden-egress
+# Egress-capable bridge used ONLY by the vw-egress-proxy for outbound OIDC calls
+# to Microsoft Entra. It is deliberately separate from the edge (ingress) network
+# so each direction has a single, named path: edge = Caddy ingress only,
+# egress = proxy outbound only. No container publishes ports on this network.
+# The proxy itself enforces the FQDN allowlist (login.microsoftonline.com,
+# graph.microsoft.com); this network just provides the route out (NIST SC-7).
+Subnet=10.89.12.0/24
+Gateway=10.89.12.1
+
+[Install]
+WantedBy=default.target

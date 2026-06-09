@@ -56,5 +56,11 @@ DB secrets created. Now set the admin token yourself (NIST IA-5):
 
   # Keep the PLAINTEXT token in your password manager — you type it at /admin.
   # Only the Argon2 hash is stored as the secret.
+
+Also set the Entra SSO client secret yourself (NIST IA-5), same posture:
+
+  # Paste the client-secret VALUE from the Entra app registration
+  # (Certificates & secrets). It never passes through this tooling.
+  printf '%s' '<ENTRA_CLIENT_SECRET_VALUE>' | podman secret create vw_sso_client_secret -
 --------------------------------------------------------------------------
 EOF

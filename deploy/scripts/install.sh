@@ -12,9 +12,11 @@ QUADLET_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd"
 echo "Installing runtime config to $DEST ..."
 mkdir -p "$DEST"
 # Runtime config the quadlets reference via %h/vaultwarden/...
-cp -r "$SRC/config"   "$DEST/"
-cp -r "$SRC/caddy"    "$DEST/"
-cp -r "$SRC/postgres" "$DEST/"
+cp -r "$SRC/config"      "$DEST/"
+cp -r "$SRC/caddy"       "$DEST/"
+cp -r "$SRC/postgres"    "$DEST/"
+# Egress allowlist proxy config (SSO -> Entra), mounted by vw-egress-proxy.
+cp -r "$SRC/egress-proxy" "$DEST/"
 # TLS dirs are created empty; you drop your internal-CA material in (see tls/README.md).
 mkdir -p "$DEST/tls/ca" "$DEST/tls/postgres" "$DEST/tls/caddy"
 chmod +x "$DEST/postgres/init/"*.sh 2>/dev/null || true

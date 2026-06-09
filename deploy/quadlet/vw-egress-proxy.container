@@ -1,0 +1,36 @@
+[Unit]
+Description=Egress allowlist proxy (Vaultwarden app -> Microsoft Entra OIDC)
+Requires=vaultwarden-internal-network.service vaultwarden-egress-network.service
+After=vaultwarden-internal-network.service vaultwarden-egress-network.service
+
+[Container]
+ContainerName=vw-egress-proxy
+# Minimal alpine + tinyproxy, built from this repo (NIST SR-3/CM-2: controlled
+# source). See deploy/egress-proxy/Containerfile. Pin by digest in production.
+Image=localhost/vw-egress-proxy:latest
+AutoUpdate=local
+
+# On the internal network at a STATIC IP so the app can target it without DNS
+# (reqwest uses a proxy by address; the proxy resolves the upstream host). Also
+# on the egress network for the actual outbound route to Entra.
+Network=vaultwarden-internal.network:ip=10.89.10.200
+Network=vaultwarden-egress.network
+
+# Config-as-code: tinyproxy config + the FQDN allowlist are mounted, not baked,
+# so the allowlist can be reviewed/changed without rebuilding the image.
+Volume=%h/vaultwarden/egress-proxy/tinyproxy.conf:/etc/tinyproxy/tinyproxy.conf:ro,Z
+Volume=%h/vaultwarden/egress-proxy/filter:/etc/tinyproxy/filter:ro,Z
+
+# --- Hardening (NIST AC-6/SC) ---
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/run:rw,size=8m
+Tmpfs=/tmp:rw,size=8m
+PodmanArgs=--memory=64m --cpus=0.25
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

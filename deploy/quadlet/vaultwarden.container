@@ -2,6 +2,11 @@
 Description=Vaultwarden (NIST 800-53B Moderate hardened fork)
 Requires=vw-data-volume.service vaultwarden-internal-network.service vw-postgres.service
 After=vw-data-volume.service vaultwarden-internal-network.service vw-postgres.service
+# SSO (Entra) egress goes through the allowlist proxy. Want it up first so the
+# first SSO login does not race the proxy; not a hard Requires (the app serves
+# without it, SSO just fails until the proxy is up).
+Wants=vw-egress-proxy.service
+After=vw-egress-proxy.service
 
 [Container]
 ContainerName=vaultwarden
@@ -20,6 +25,18 @@ Secret=vw_admin_token,type=mount,target=/run/secrets/vw_admin_token,mode=0400
 Secret=vw_database_url,type=mount,target=/run/secrets/vw_database_url,mode=0400
 Environment=ADMIN_TOKEN_FILE=/run/secrets/vw_admin_token
 Environment=DATABASE_URL_FILE=/run/secrets/vw_database_url
+# SSO (Entra) client secret as a podman secret, read via native <KEY>_FILE.
+# Operator-set (never by tooling), same posture as ADMIN_TOKEN.
+Secret=vw_sso_client_secret,type=mount,target=/run/secrets/vw_sso_client_secret,mode=0400
+Environment=SSO_CLIENT_SECRET_FILE=/run/secrets/vw_sso_client_secret
+
+# Route the app's outbound OIDC (reqwest) calls through the egress allowlist
+# proxy (NIST SC-7). The app stays on the no-egress internal network and reaches
+# the proxy at its static internal IP. NO_PROXY covers internal targets (the
+# Postgres connection is raw TCP and unaffected by these anyway).
+Environment=HTTP_PROXY=http://10.89.10.200:8888
+Environment=HTTPS_PROXY=http://10.89.10.200:8888
+Environment=NO_PROXY=localhost,127.0.0.1,vw-postgres,10.89.10.0/24
 
 Volume=vw-data.volume:/data:Z
 # Internal CA cert so the app validates the PostgreSQL server cert (sslmode=verify-full).

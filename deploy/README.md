@@ -32,7 +32,9 @@ managed as **systemd quadlets** (config-as-code, NIST CM).
 | No public DB; egress restricted | SC-7 | `Internal=true` network; DB never published |
 | Non-root, cap-drop, read-only FS, limits | AC-6/SC | quadlet hardening keys |
 | Audit + lockout + banner + session | AU/AC | fork features, on in `config/vaultwarden.env` |
-| Image from controlled source | SR-3/CM-2 | `scripts/build-image.sh`, pin digest |
+| SSO (Entra OIDC), SSO-only | IA-2/IA-8 | `SSO_*` in `config/vaultwarden.env`; client secret as a podman secret (see ADR-0005) |
+| Egress allowlist to Entra only | SC-7 | `vw-egress-proxy` (tinyproxy, default-deny) on `vaultwarden-egress`; app routes OIDC via `HTTPS_PROXY` |
+| Image from controlled source | SR-3/CM-2 | `scripts/build-image.sh` + `scripts/build-egress-proxy.sh`, pin digests |
 
 ## Deploy (first time)
 
@@ -55,9 +57,10 @@ deploy/scripts/install.sh
 deploy/secrets/create-secrets.sh
 #    (follow the printed 'vaultwarden hash' step for vw_admin_token)
 
-# 5. Build the hardened image from this fork
+# 5. Build the hardened image from this fork (+ the SSO egress proxy)
 deploy/scripts/build-image.sh
-#    then pin the printed digest in ~/vaultwarden/.../vaultwarden.container
+deploy/scripts/build-egress-proxy.sh
+#    then pin the printed digests in the matching .container units
 
 # 6. Start (Caddy pulls up the whole dependency chain)
 systemctl --user start vw-caddy.service
