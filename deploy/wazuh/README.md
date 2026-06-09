@@ -2,7 +2,7 @@
 
 Adds **AU-6** (log review/forwarding), **SI-4** (monitoring), and **IR-4**
 (incident handling input) to the hardened podman stack by shipping the
-`vaultwarden::audit` JSON, Caddy JSON access logs, and PostgreSQL logs to an
+`nextvault::audit` JSON, Caddy JSON access logs, and PostgreSQL logs to an
 external **Wazuh manager**, which runs the decoders/rules in this directory and
 raises alerts.
 

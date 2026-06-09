@@ -3,7 +3,7 @@
 //! Additive fork module (see docs/adr/0002). When `AUDIT_LOG_ENABLED=true`,
 //! every security event routed through the two event choke points
 //! (`log_event` / `log_user_event` in `src/api/core/events.rs`) emits a single
-//! line of JSON to the application log on the `vaultwarden::audit` target.
+//! line of JSON to the application log on the `nextvault::audit` target.
 //!
 //! This is independent of the upstream `ORG_EVENTS_ENABLED` feature.
 //!
@@ -150,7 +150,7 @@ pub fn audit_record_json(
 /// Emit an audit record for an upstream `EventType`-coded security event.
 ///
 /// No-op unless `AUDIT_LOG_ENABLED` is set. Logs a single JSON line on the
-/// `vaultwarden::audit` target.
+/// `nextvault::audit` target.
 pub fn emit(
     event_type: i32,
     source_uuid: Option<&str>,
@@ -171,7 +171,7 @@ pub fn emit(
         None
     };
     let record = audit_record_json(event_type, &name, user_uuid, act_user_uuid, org_uuid, cipher_uuid, device_type, ip);
-    info!(target: "vaultwarden::audit", "{record}");
+    info!(target: "nextvault::audit", "{record}");
 }
 
 /// Emit an audit record for a non-`EventType` administrative security event
@@ -187,7 +187,7 @@ pub fn emit_named(event_name: &str, user_uuid: Option<&str>, ip: Option<&str>) {
     insert_opt(&mut map, "user_uuid", user_uuid);
     insert_opt(&mut map, "ip", ip);
     let record = Value::Object(map);
-    info!(target: "vaultwarden::audit", "{record}");
+    info!(target: "nextvault::audit", "{record}");
 }
 
 #[cfg(test)]
