@@ -1,0 +1,44 @@
+{
+	# No ACME: we terminate TLS with an internal/enterprise CA cert.
+	auto_https disable_redirects
+	admin off
+	# Don't leak the proxy version.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# EDIT the hostname to match your DOMAIN and your internal-CA cert SAN.
+# Default port 8443 works rootless; switch to 443 once the host allows it.
+vaultwarden.example.com:8443 {
+	tls /etc/caddy/tls/server.crt /etc/caddy/tls/server.key
+
+	# Security headers (NIST SC). HSTS only matters once you serve on 443.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	# NIST AC: restrict /admin to approved networks. EDIT the allowlist CIDRs.
+	@admin path /admin /admin/*
+	handle @admin {
+		@admin_denied not remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+		respond @admin_denied "Forbidden" 403
+		reverse_proxy vaultwarden:8080
+	}
+
+	# Everything else, including the WebSocket upgrade at /notifications/hub
+	# (Caddy proxies Upgrade/Connection headers transparently → HTTP 101).
+	handle {
+		reverse_proxy vaultwarden:8080
+	}
+
+	# Access + error logging to stdout for SIEM ingestion (NIST AU).
+	log {
+		output stdout
+		format json
+	}
+}

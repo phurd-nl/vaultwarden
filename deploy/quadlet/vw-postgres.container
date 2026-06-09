@@ -1,0 +1,57 @@
+[Unit]
+Description=PostgreSQL for Vaultwarden (TLS, least-privilege app role)
+Requires=vw-pgdata-volume.service vaultwarden-internal-network.service
+After=vw-pgdata-volume.service vaultwarden-internal-network.service
+
+[Container]
+ContainerName=vw-postgres
+# NIST CM-2/SR: pin by digest in production. Replace the tag with image@sha256:...
+Image=docker.io/library/postgres:17.5
+AutoUpdate=local
+Network=vaultwarden-internal.network
+# DB is reachable ONLY on the internal network — never published to the host.
+
+# --- Bootstrap (superuser is used only for init; the app uses a least-priv role) ---
+Environment=POSTGRES_USER=postgres
+Environment=POSTGRES_DB=vaultwarden
+Environment=POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
+Secret=vw_pg_superuser_password,type=env,target=POSTGRES_PASSWORD
+# App-role password is exposed to the init script as a mounted file (see init/01-app-role.sh).
+Secret=vw_db_app_password,type=mount,mode=0444
+
+Volume=vw-pgdata.volume:/var/lib/postgresql/data:Z
+Volume=%h/vaultwarden/postgres/init:/docker-entrypoint-initdb.d:ro,Z
+# TLS material from your internal/enterprise CA. The server cert SAN MUST include
+# the hostname "vw-postgres" so the app's sslmode=verify-full succeeds.
+Volume=%h/vaultwarden/tls/postgres:/etc/postgresql/tls:ro,Z
+Volume=%h/vaultwarden/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro,Z
+
+# Enable TLS + SCRAM + audit-relevant logging (NIST AU). pg_hba forces hostssl.
+Exec=postgres \
+  -c ssl=on \
+  -c ssl_cert_file=/etc/postgresql/tls/server.crt \
+  -c ssl_key_file=/etc/postgresql/tls/server.key \
+  -c ssl_ca_file=/etc/postgresql/tls/ca.crt \
+  -c hba_file=/etc/postgresql/pg_hba.conf \
+  -c password_encryption=scram-sha-256 \
+  -c log_connections=on \
+  -c log_disconnections=on \
+  -c log_hostname=on \
+  -c log_line_prefix='%m [%p] %q%u@%d %r '
+
+# --- Hardening (NIST AC/SC/SI) ---
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=CHOWN DAC_OVERRIDE FOWNER SETGID SETUID
+# postgres needs a writable data dir + tmp; rootfs is otherwise read-only.
+ReadOnly=true
+Tmpfs=/tmp:rw,size=64m,mode=1777
+Tmpfs=/run:rw,size=64m
+PodmanArgs=--memory=1g --cpus=1.0 --health-cmd="pg_isready -U postgres -d vaultwarden" --health-interval=30s
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,36 @@
+[Unit]
+Description=Caddy reverse proxy / TLS termination for Vaultwarden
+Requires=vaultwarden-edge-network.service vaultwarden-internal-network.service vaultwarden.service
+After=vaultwarden-edge-network.service vaultwarden-internal-network.service vaultwarden.service
+
+[Container]
+ContainerName=vw-caddy
+# NIST CM-2/SR: pin by digest in production.
+Image=docker.io/library/caddy:2.8
+AutoUpdate=local
+# Caddy is the ONLY container on both networks: edge (ingress) + internal (to app).
+Network=vaultwarden-edge.network
+Network=vaultwarden-internal.network
+
+# Published on 8443 by default so it works under rootless podman with no sysctl
+# changes. For real port 443: set net.ipv4.ip_unprivileged_port_start=443, or run
+# these quadlets rootful, then change to 443:8443. (See deploy/README.md.)
+PublishPort=8443:8443
+
+Volume=%h/vaultwarden/caddy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+Volume=vw-caddy-data.volume:/data:Z
+# TLS server cert/key issued by your internal/enterprise CA (SAN = your DOMAIN).
+Volume=%h/vaultwarden/tls/caddy:/etc/caddy/tls:ro,Z
+
+# --- Hardening ---
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp:rw,size=32m
+PodmanArgs=--memory=256m --cpus=0.5
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
