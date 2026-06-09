@@ -50,6 +50,7 @@ use rocket::data::{Limits, ToByteUnit};
 #[macro_use]
 mod error;
 mod api;
+mod audit;
 mod auth;
 mod config;
 mod crypto;
@@ -57,6 +58,7 @@ mod crypto;
 mod db;
 mod http_client;
 mod mail;
+mod nist_session; // NIST AC-11/AC-12 session timeout logic (additive)
 mod ratelimit;
 mod sso;
 mod sso_client;

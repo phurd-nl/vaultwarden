@@ -392,7 +392,11 @@ fn create_auth_tokens_impl(
         match decode_token_claims("refresh_token", &rt) {
             Err(_) => {
                 let time_now = Utc::now();
-                let exp = (time_now + *DEFAULT_REFRESH_VALIDITY).timestamp();
+                // NIST AC-12: honor configurable refresh-token lifetime; fall back to the const.
+                let validity = chrono::TimeDelta::try_days(CONFIG.session_refresh_validity_days())
+                    .filter(|d| *d > chrono::TimeDelta::zero())
+                    .unwrap_or(*DEFAULT_REFRESH_VALIDITY);
+                let exp = (time_now + validity).timestamp();
                 debug!("Non jwt refresh_token (expiration set to {exp})");
                 (time_now.timestamp(), exp, TokenWrapper::Refresh(rt))
             }

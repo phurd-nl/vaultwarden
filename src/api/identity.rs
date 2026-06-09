@@ -378,6 +378,23 @@ async fn password_login(
         )
     }
 
+    // NIST AC-7: reject login while the account is in a lockout cooldown,
+    // before verifying the password or issuing any token.
+    if crate::audit::lockout::is_currently_locked(
+        CONFIG.account_lockout_enabled(),
+        user.locked_until,
+        Utc::now().naive_utc(),
+    ) {
+        crate::audit::emit_named("user.login.locked", Some(&user.uuid), Some(&ip.ip.to_string()));
+        err!(
+            "Account is temporarily locked. Try again later.",
+            format!("IP: {}. Username: {username}.", ip.ip),
+            ErrorEvent {
+                event: EventType::UserFailedLogIn
+            }
+        )
+    }
+
     let password = data.password.as_ref().unwrap();
 
     // If we get an auth request, we don't check the user's password, but the access code of the auth request
@@ -410,6 +427,25 @@ async fn password_login(
             )
         }
     } else if !user.check_valid_password(password) {
+        // NIST AC-7: record the failed attempt and lock the account once the
+        // configured threshold is crossed.
+        if CONFIG.account_lockout_enabled() {
+            let decision = crate::audit::lockout::decide_after_failure(
+                true,
+                user.failed_login_count,
+                CONFIG.account_lockout_max_attempts(),
+                CONFIG.account_lockout_cooldown_seconds(),
+                Utc::now().naive_utc(),
+            );
+            user.failed_login_count = decision.new_failed_count;
+            user.locked_until = decision.new_locked_until;
+            if let Err(e) = user.save(conn).await {
+                error!("Error updating user lockout state: {e:#?}");
+            }
+            if decision.should_lock {
+                crate::audit::emit_named("user.locked", Some(&user.uuid), Some(&ip.ip.to_string()));
+            }
+        }
         err!(
             "Username or password is incorrect. Try again",
             format!("IP: {}. Username: {username}.", ip.ip),
@@ -417,6 +453,16 @@ async fn password_login(
                 event: EventType::UserFailedLogIn,
             }
         )
+    }
+
+    // NIST AC-7: on a successful credential check, clear any accumulated
+    // failed-attempt state so the next failure series starts fresh.
+    if user.failed_login_count > 0 || user.locked_until.is_some() {
+        user.failed_login_count = 0;
+        user.locked_until = None;
+        if let Err(e) = user.save(conn).await {
+            error!("Error resetting user lockout state: {e:#?}");
+        }
     }
 
     // Change the KDF Iterations (only when not logging in with an auth request)

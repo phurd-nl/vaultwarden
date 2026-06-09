@@ -1,4 +1,12 @@
 <main class="container-xxl">
+    {{#if login_banner}}
+    <div class="align-items-center p-3 mb-3 text-dark bg-info rounded shadow">
+        <div>
+            <h6 class="mb-0 text-dark" style="white-space: pre-line;">{{login_banner}}</h6>
+        </div>
+    </div>
+    {{/if}}
+
     {{#if error}}
     <div class="align-items-center p-3 mb-3 text-opacity-50 text-dark bg-warning rounded shadow">
         <div>

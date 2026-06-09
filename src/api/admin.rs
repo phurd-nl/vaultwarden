@@ -167,7 +167,9 @@ fn render_admin_login(msg: Option<&str>, redirect: Option<&str>) -> ApiResult<Ht
         "page_content": "admin/login",
         "error": msg,
         "redirect": redirect,
-        "urlpath": CONFIG.domain_path()
+        "urlpath": CONFIG.domain_path(),
+        // NIST AC-8 system-use notification (additive fork): rendered above the login form when set.
+        "login_banner": CONFIG.login_banner(),
     });
 
     // Return the page
@@ -212,6 +214,7 @@ fn post_admin_login(
             .secure(secure.https);
 
         cookies.add(cookie);
+        crate::audit::emit_named("admin.login.success", None, Some(&ip.ip.to_string())); // NIST AU audit hook (slice 2)
         if let Some(redirect) = redirect {
             Ok(Redirect::to(format!("{}{redirect}", admin_path())))
         } else {
@@ -219,6 +222,7 @@ fn post_admin_login(
         }
     } else {
         error!("Invalid admin token. IP: {}", ip.ip);
+        crate::audit::emit_named("admin.login.failure", None, Some(&ip.ip.to_string())); // NIST AU audit hook (slice 2)
         Err(AdminResponse::Unauthorized(render_admin_login(
             Some("Invalid admin token, please try again."),
             redirect.as_deref(),
@@ -795,11 +799,12 @@ fn get_diagnostics_http(code: u16, _token: AdminToken) -> EmptyResult {
 }
 
 #[post("/config", format = "application/json", data = "<data>")]
-async fn post_config(data: Json<ConfigBuilder>, _token: AdminToken) -> EmptyResult {
+async fn post_config(data: Json<ConfigBuilder>, token: AdminToken) -> EmptyResult {
     let data: ConfigBuilder = data.into_inner();
     if let Err(e) = CONFIG.update_config(data, true).await {
         err!(format!("Unable to save config: {e:?}"))
     }
+    crate::audit::emit_named("admin.config.changed", None, Some(&token.ip.ip.to_string())); // NIST AU audit hook (slice 2)
     Ok(())
 }
 

@@ -221,7 +221,8 @@ fn config() -> Json<Value> {
     );
     feature_states.insert("pm-19148-innovation-archive".to_owned(), true);
 
-    Json(json!({
+    // NIST AC-8 system-use notification: surface the operator login banner only when set (additive fork).
+    let mut cfg = json!({
         // Note: The clients use this version to handle backwards compatibility concerns
         // This means they expect a version that closely matches the Bitwarden server version
         // We should make sure that we keep this updated when we support the new server features
@@ -252,7 +253,11 @@ fn config() -> Json<Value> {
         },
         "featureStates": feature_states,
         "object": "config",
-    }))
+    });
+    if let Some(obj) = cfg.as_object_mut() {
+        obj.extend(crate::audit::banner::config_fragment(CONFIG.login_banner().as_deref()));
+    }
+    Json(cfg)
 }
 
 pub fn catchers() -> Vec<Catcher> {
