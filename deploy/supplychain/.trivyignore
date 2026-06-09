@@ -1,0 +1,30 @@
+# Vulnerability exception allowlist (NIST RA-5 / SI-2 exception process).
+#
+# scan.sh passes this file to `trivy --ignorefile`. A CVE listed here is
+# EXCLUDED from the severity gate: it has been reviewed and ACCEPTED (false
+# positive, not reachable in this deployment, or no fix yet available).
+#
+# RULES (the exception process — enforced by review, not the tool):
+#   1. One CVE ID per line.
+#   2. Every entry MUST have the comment block below it filled in:
+#        - Justification : why this finding is accepted (reachability / no-fix / FP).
+#        - Approved-by    : the role/person who accepted the risk.
+#        - Date           : date accepted (UTC).
+#        - Expires        : review-by date — re-evaluate at/before this date.
+#   3. No bare CVE without the four fields. An auditor reads this file as the
+#      RA-5/SI-2 exception register.
+#   4. Prefer remediation (rebuild / base-image bump) over an exception.
+#
+# trivy also supports an inline `cve-id exp:2026-12-31` expiry suffix; we keep the
+# expiry in the comment block so grype users (.grype.yaml) follow the same format.
+#
+# --- EXAMPLE (delete once you have real entries) -------------------------------
+# CVE-0000-00000
+#   # Justification : glibc CVE not reachable — vaultwarden binary is statically
+#   #                 built and does not call the affected setlocale path.
+#   # Approved-by   : Security Lead (NIST AO delegate)
+#   # Date          : 2026-06-09
+#   # Expires       : 2026-09-09
+# -------------------------------------------------------------------------------
+#
+# (No active exceptions. Empty allowlist = gate enforced on all findings.)

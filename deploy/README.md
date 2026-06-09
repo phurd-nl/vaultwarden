@@ -85,13 +85,24 @@ BASE=https://vaultwarden.example.com:8443 deploy/scripts/verify.sh
 - **Image digest pinning (CM-2/SR):** replace the `:latest`/`:tag` images in the
   `.container` units with `name@sha256:...` before production.
 
-## Not yet built (next deployment slices)
+## Extensions (built; opt-in at deploy time)
 
-- **Backups/PITR (CP-9/CP-10):** encrypted `pg_dump` + WAL archiving + `/data`
-  (attachments, sends, `rsa_key.pem`) to offsite immutable storage, with a
-  tested restore. *Next slice.*
-- **Log shipping (AU-6):** forward the `vaultwarden::audit` JSON lines + Caddy +
-  Postgres logs to your SIEM. *Needs the SIEM product name.*
-- **Warm standby + manual failover (CP-10):** second app instance against the
-  same DB + replicated `/data`, with a failover runbook.
-- **SBOM + image scan (SR-3/RA-5):** generate SBOM and scan the built image.
+Each lives in its own subdirectory with its own README and exact enable steps.
+They are opt-in because enabling them edits the core quadlets/Postgres config in
+environment-specific ways (WAL volume, replication seeding, journald driver,
+real image digests) that belong to deploy time.
+
+| Subdir | Control | What it adds | Enable |
+|---|---|---|---|
+| `backup/` | CP-9/CP-10/MP | Encrypted `pg_dump` + `/data` archive, WAL archiving + `pg_basebackup` for PITR, daily user timer, restore + test-restore runbook | `backup/README.md` |
+| `wazuh/` | AU-6/SI/IR | Wazuh agent sidecar + decoders/rules for the `vaultwarden::audit` JSON, Caddy, and Postgres logs; alerts mapped to the handoff alert list | `wazuh/README.md` |
+| `standby/` | CP-10 | Warm standby app + streaming-replica Postgres, `/data` rsync, manual failover/failback runbooks | `standby/README.md` |
+| `supplychain/` | SR-3/SR-4/RA-5/CM-2 | SBOM (CycloneDX+SPDX), Trivy/Grype scan with severity gate + exceptions, digest-pinning helper, provenance/EOL policy | `supplychain/README.md` |
+
+Each subdir's README lists the precise core-quadlet edits its feature needs;
+apply them only when you turn that feature on.
+
+## Still your org (not codeable)
+
+FIPS 199 categorization, System Security Plan, POA&M, AO sign-off, access
+reviews, IR tabletops — see the handoff doc's Workstreams 1 and 16.

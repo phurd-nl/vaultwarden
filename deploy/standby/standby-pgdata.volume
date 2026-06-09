@@ -1,0 +1,12 @@
+[Unit]
+Description=PostgreSQL REPLICA data directory for Vaultwarden (seeded by pg_basebackup)
+
+[Volume]
+VolumeName=standby-pgdata
+# Seeded once by setup-replication.sh (pg_basebackup -R) and then continuously
+# written by WAL streaming. NIST MP/SC-28: must reside on encrypted-at-rest
+# storage, exactly like vw-pgdata (see deploy/README.md). On a two-host topology
+# this volume lives on the STANDBY host.
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,39 @@
+# =============================================================================
+# vw-backup.service — runs the encrypted backup once (driven by vw-backup.timer).
+#
+# NIST 800-53B Moderate: CP-9 (scheduled, automated backups).
+#
+# Plain systemd USER unit (NOT a quadlet): quadlets generate container units and
+# cannot express timers. Install under ~/.config/systemd/user/ — see README
+# "Scheduling".  Type=oneshot: the timer triggers it; it exits when done.
+#
+# BACKUP_DEST defaults to an absolute path so the timer doesn't depend on a CWD.
+# Edit Environment= / EnvironmentFile= for your destination and tuning.
+# =============================================================================
+[Unit]
+Description=Vaultwarden encrypted backup (pg_dump + /data, NIST CP-9)
+Documentation=file:%h/vaultwarden/deploy/backup/README.md
+# Only meaningful if the DB container is up; don't fail the boot if it isn't.
+Wants=vw-postgres.service
+After=vw-postgres.service
+
+[Service]
+Type=oneshot
+# Absolute destination so a missing CWD can't silently scatter backups.
+Environment=BACKUP_DEST=%h/vaultwarden/backups
+Environment=RETENTION_DAYS=30
+# Point this at wherever install puts the scripts (adjust if you relocate them).
+ExecStart=%h/vaultwarden/deploy/backup/backup.sh
+# Don't let a single slow dump pile up runs.
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle
+# Light hardening for the unit itself (defense in depth). We deliberately do
+# NOT use ProtectHome/ProtectSystem here: rootless podman needs its runtime and
+# storage dirs under $HOME, and over-sandboxing the wrapper silently breaks the
+# `podman exec`/`podman run` calls. The real isolation is in the podman flags
+# inside backup.sh (read-only mounts, --network=none, cap-drop).
+NoNewPrivileges=true
+
+# Note: this is a *user* service; it does not have [Install] because the TIMER
+# is what gets enabled, not the service.

@@ -8,7 +8,10 @@ TAG="${1:-localhost/vaultwarden-nist:latest}"
 
 cd "$REPO_ROOT"
 echo "Building $TAG from $REPO_ROOT (DB=postgresql) ..."
+# --format docker is REQUIRED: the Dockerfile uses SHELL ["/bin/bash", ...]
+# (for `source`), which podman's default OCI format ignores.
 podman build \
+	--format docker \
 	-f docker/Dockerfile.debian \
 	--build-arg DB=postgresql \
 	--build-arg CARGO_PROFILE=release \

@@ -1,0 +1,6 @@
+# Generated/runtime output — never commit
+backup/backups/
+backup/wal-archive/
+supplychain/sbom/
+supplychain/reports/
+*.log
