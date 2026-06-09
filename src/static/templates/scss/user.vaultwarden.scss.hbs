@@ -1,1 +1,65 @@
-/* See the wiki for examples and details: https://github.com/dani-garcia/vaultwarden/wiki/Customize-Vaultwarden-CSS */
+/* NextVault theme (Navy + Aqua) — additive admin/login styling.
+ * Palette slightly follows the Nextlink 2026 brand book (not a clone).
+ * Applied as Bootstrap CSS-variable overrides so it rides on top of the
+ * bundled Bootswatch theme without forking the upstream SCSS. */
+
+:root {
+  /* NextVault brand palette */
+  --nv-navy:        #112F45;  /* primary  */
+  --nv-aqua:        #4D9CB9;  /* accent   */
+  --nv-aqua-hover:  #6FB4CE;
+  --nv-success:     #3E8D61;
+  --nv-danger:      #D84836;
+  --nv-warning:     #F4BA41;
+  --nv-text:        #303030;
+  --nv-muted:       #595959;
+  --nv-border:      #D0D0CE;
+  --nv-bg:          #F7F7F7;
+
+  /* Map onto Bootstrap so existing components pick up the brand colors */
+  --bs-primary:        var(--nv-navy);
+  --bs-primary-rgb:    17, 47, 69;
+  --bs-info:           var(--nv-aqua);
+  --bs-info-rgb:       77, 156, 185;
+  --bs-success:        var(--nv-success);
+  --bs-success-rgb:    62, 141, 97;
+  --bs-danger:         var(--nv-danger);
+  --bs-danger-rgb:     216, 72, 54;
+  --bs-warning:        var(--nv-warning);
+  --bs-warning-rgb:    244, 186, 65;
+  --bs-body-bg:        var(--nv-bg);
+  --bs-body-color:     var(--nv-text);
+  --bs-body-color-rgb: 48, 48, 48;
+  --bs-border-color:   var(--nv-border);
+
+  /* Links use the aqua accent */
+  --bs-link-color:        var(--nv-aqua);
+  --bs-link-color-rgb:    77, 156, 185;
+  --bs-link-hover-color:  var(--nv-aqua-hover);
+}
+
+/* Navy header bar with light text + aqua hover (NextVault identity). */
+.navbar {
+  background-color: var(--nv-navy) !important;
+}
+.navbar .navbar-brand,
+.navbar .nav-link {
+  color: #F7F7F7 !important;
+}
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  color: var(--nv-aqua-hover) !important;
+}
+
+/* Primary buttons: navy base, aqua on hover for a branded accent. */
+.btn-primary {
+  --bs-btn-bg: var(--nv-navy);
+  --bs-btn-border-color: var(--nv-navy);
+  --bs-btn-hover-bg: var(--nv-aqua);
+  --bs-btn-hover-border-color: var(--nv-aqua);
+  --bs-btn-active-bg: var(--nv-aqua-hover);
+  --bs-btn-active-border-color: var(--nv-aqua-hover);
+}
+
+/* System-use notification banner (AC-8) in the brand navy. */
+a { text-decoration-color: var(--nv-aqua); }
