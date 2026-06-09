@@ -43,3 +43,25 @@ action is deferred to the admin/IR work.
 - Requires a schema migration (additive columns, backward compatible).
 - Login-path change is confined to the failed-login and successful-login points.
 - Locked-out legitimate users recover automatically after the cooldown.
+
+## Scope / coverage limits
+
+The counter increments only on the credential-verification failure paths in
+`password_login`: a wrong master password and a bad passwordless auth-request
+access code. The following are deliberately **not** counted toward lockout in
+v1, and an assessor should be aware of the boundary:
+
+- **Second-factor (2FA) failures** after a correct password
+  (`UserFailedLogIn2fa`). The master password — the brute-forceable secret — is
+  already protected; 2FA failures are throttled by the existing login
+  rate-limit.
+- **SSO logins**, which authenticate through the identity provider on a separate
+  code path; account lockout there is the IdP's responsibility (and a federal
+  deployment would lean on the IdP's AC-7).
+- **Failed logins against a non-existent username**, which return before a
+  `users` row exists and therefore cannot be attributed to (or counted against)
+  an account. Login rate-limiting still applies.
+
+These gaps do not weaken protection of the password secret; they scope the
+control to the vector AC-7 is primarily concerned with (master-password
+guessing).

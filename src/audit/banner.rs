@@ -5,6 +5,11 @@
 //! the pure mapping from the configured value to the JSON fragment merged into
 //! the client config endpoint, kept side-effect-free so it is unit-testable.
 //!
+//! Note: the stock Bitwarden web/desktop/mobile clients ignore unknown
+//! `GET /api/config` fields, so `loginBanner` will not render on the end-user
+//! vault login screen without a custom client. The assessor-facing surface is
+//! the `/admin` login page (see `templates/admin/login.hbs`).
+//!
 //! NEVER serialize secrets here: the banner is operator-authored display text.
 
 use serde_json::{Map, Value};

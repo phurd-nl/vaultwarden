@@ -42,3 +42,16 @@ default. The operator selects a policy value.
 - Idle logic is confined to `auth::refresh_tokens`; absolute lifetime replaces
   two static consts with config lookups.
 - The chosen policy value becomes documented evidence, not a code default.
+
+## Idle-timeout efficacy caveat
+
+The idle check keys on `device.updated_at`, which is bumped on **every token
+refresh**, not on every user interaction. It therefore measures
+time-since-last-refresh, not true user inactivity: a client that refreshes the
+access token in the background while the user is away resets the idle clock.
+The server has no per-request activity signal to key on without broader upstream
+changes (ADR-0001 keeps the fork additive). Consequently the server-side idle
+timeout is a backstop; interactive idle *lock* (AC-11) is primarily delivered by
+the Bitwarden client vault-timeout, enforceable org-wide via the Vault Timeout
+policy. Operators relying on AC-11 should set both the client policy and this
+server-side window.

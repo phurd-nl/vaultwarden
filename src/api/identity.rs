@@ -349,11 +349,12 @@ async fn sso_login(
 /// configured threshold is crossed. Shared by the password and auth-request
 /// failure paths. No-op when lockout is disabled.
 async fn record_failed_login_attempt(user: &mut User, ip: &ClientIp, conn: &DbConn) {
-    if !CONFIG.account_lockout_enabled() {
+    let enabled = CONFIG.account_lockout_enabled();
+    if !enabled {
         return;
     }
     let decision = crate::audit::lockout::decide_after_failure(
-        true,
+        enabled,
         user.failed_login_count,
         CONFIG.account_lockout_max_attempts(),
         CONFIG.account_lockout_cooldown_seconds(),
