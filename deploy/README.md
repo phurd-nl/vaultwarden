@@ -28,7 +28,7 @@ managed as **systemd quadlets** (config-as-code, NIST CM).
 | WebSocket upgrade (101) | functional | Caddy transparent upgrade |
 | DB TLS `verify-full` + SCRAM | SC-8/IA-5 | `postgres/pg_hba.conf`, server SAN=`vw-postgres` |
 | Least-privilege DB role | AC-6 | `postgres/init/01-app-role.sh` (non-superuser, owns only its DB) |
-| Secrets out of config/git | IA-5/SC-28 | `podman secret` + `/etc/vaultwarden.d/10-secrets.sh` |
+| Secrets out of config/git | IA-5/SC-28 | `podman secret` mounted as files + native `<KEY>_FILE` (`ADMIN_TOKEN_FILE`, `DATABASE_URL_FILE`) |
 | No public DB; egress restricted | SC-7 | `Internal=true` network; DB never published |
 | Non-root, cap-drop, read-only FS, limits | AC-6/SC | quadlet hardening keys |
 | Audit + lockout + banner + session | AU/AC | fork features, on in `config/vaultwarden.env` |

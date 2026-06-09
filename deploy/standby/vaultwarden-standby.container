@@ -30,12 +30,14 @@ EnvironmentFile=%h/vaultwarden/config/vaultwarden.env
 # promoted (read/write) before the standby app is started against it.
 Secret=vw_admin_token,type=mount,target=/run/secrets/vw_admin_token,mode=0400
 Secret=vw_database_url_standby,type=mount,target=/run/secrets/vw_database_url,mode=0400
+# Native <KEY>_FILE support reads the secret from the file path (no shim).
+Environment=ADMIN_TOKEN_FILE=/run/secrets/vw_admin_token
+Environment=DATABASE_URL_FILE=/run/secrets/vw_database_url
 
 # DISTINCT /data volume kept consistent from the primary by data-sync.sh.
 # On a single host this is standby-data; on a two-host topology this is the
 # rsync target on the standby host. See README "/data replication".
 Volume=standby-data.volume:/data:Z
-Volume=%h/vaultwarden/config/vaultwarden.d:/etc/vaultwarden.d:ro,Z
 # Internal CA cert so the app validates the PostgreSQL server cert (verify-full).
 Volume=%h/vaultwarden/tls/ca/internal-ca.crt:/etc/ssl/certs/internal-ca.crt:ro,Z
 

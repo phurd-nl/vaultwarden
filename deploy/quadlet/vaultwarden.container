@@ -14,13 +14,14 @@ Network=vaultwarden-internal.network
 # Non-secret configuration as code (NIST CM).
 EnvironmentFile=%h/vaultwarden/config/vaultwarden.env
 
-# Secrets mounted as files; /etc/vaultwarden.d/10-secrets.sh exports them as env
-# at startup (this fork has no native _FILE support; start.sh sources that dir).
+# Secrets mounted as files; Vaultwarden's native <KEY>_FILE support
+# (util.rs get_env_str_value) reads the value from the file path. No shim needed.
 Secret=vw_admin_token,type=mount,target=/run/secrets/vw_admin_token,mode=0400
 Secret=vw_database_url,type=mount,target=/run/secrets/vw_database_url,mode=0400
+Environment=ADMIN_TOKEN_FILE=/run/secrets/vw_admin_token
+Environment=DATABASE_URL_FILE=/run/secrets/vw_database_url
 
 Volume=vw-data.volume:/data:Z
-Volume=%h/vaultwarden/config/vaultwarden.d:/etc/vaultwarden.d:ro,Z
 # Internal CA cert so the app validates the PostgreSQL server cert (sslmode=verify-full).
 Volume=%h/vaultwarden/tls/ca/internal-ca.crt:/etc/ssl/certs/internal-ca.crt:ro,Z
 
