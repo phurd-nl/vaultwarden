@@ -14,9 +14,6 @@ use chrono::{Duration, NaiveDateTime};
 /// Result of evaluating the lockout policy for a single login event.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Decision {
-    /// The account is currently locked (cooldown has not yet elapsed); reject
-    /// the login before verifying the password.
-    pub currently_locked: bool,
     /// The most recent failure pushed the consecutive-failure count to the
     /// threshold; the caller should set `locked_until` and reset the counter.
     pub should_lock: bool,
@@ -51,7 +48,6 @@ pub fn decide_after_failure(
 ) -> Decision {
     if !enabled || max_attempts <= 0 {
         return Decision {
-            currently_locked: false,
             should_lock: false,
             new_failed_count: failed_count,
             new_locked_until: None,
@@ -61,7 +57,6 @@ pub fn decide_after_failure(
     let incremented = failed_count.saturating_add(1);
     if incremented >= max_attempts {
         Decision {
-            currently_locked: false,
             should_lock: true,
             // Reset the counter once we lock; the lock itself enforces the cooldown.
             new_failed_count: 0,
@@ -69,7 +64,6 @@ pub fn decide_after_failure(
         }
     } else {
         Decision {
-            currently_locked: false,
             should_lock: false,
             new_failed_count: incremented,
             new_locked_until: None,
@@ -90,7 +84,6 @@ mod tests {
     fn disabled_never_locks_and_leaves_count_untouched() {
         let d = decide_after_failure(false, 4, 5, 900, t(0));
         assert!(!d.should_lock);
-        assert!(!d.currently_locked);
         assert_eq!(d.new_failed_count, 4);
         assert_eq!(d.new_locked_until, None);
     }

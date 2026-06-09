@@ -345,6 +345,30 @@ async fn sso_login(
     authenticated_response(&user, &mut device, auth_tokens, twofactor_token, conn, ip).await
 }
 
+/// NIST AC-7: record a failed login attempt and lock the account once the
+/// configured threshold is crossed. Shared by the password and auth-request
+/// failure paths. No-op when lockout is disabled.
+async fn record_failed_login_attempt(user: &mut User, ip: &ClientIp, conn: &DbConn) {
+    if !CONFIG.account_lockout_enabled() {
+        return;
+    }
+    let decision = crate::audit::lockout::decide_after_failure(
+        true,
+        user.failed_login_count,
+        CONFIG.account_lockout_max_attempts(),
+        CONFIG.account_lockout_cooldown_seconds(),
+        Utc::now().naive_utc(),
+    );
+    user.failed_login_count = decision.new_failed_count;
+    user.locked_until = decision.new_locked_until;
+    if let Err(e) = user.save(conn).await {
+        error!("Error updating user lockout state: {e:#?}");
+    }
+    if decision.should_lock {
+        crate::audit::emit_named("user.locked", Some(&user.uuid), Some(&ip.ip.to_string()));
+    }
+}
+
 async fn password_login(
     data: ConnectData,
     user_id: &mut Option<UserId>,
@@ -418,6 +442,8 @@ async fn password_login(
             || ip.ip.to_string() != auth_request.request_ip
             || !auth_request.check_access_code(password)
         {
+            // NIST AC-7: a bad access code is a failed authentication too.
+            record_failed_login_attempt(&mut user, ip, conn).await;
             err!(
                 "Username or access code is incorrect. Try again",
                 format!("IP: {}. Username: {username}.", ip.ip),
@@ -427,25 +453,8 @@ async fn password_login(
             )
         }
     } else if !user.check_valid_password(password) {
-        // NIST AC-7: record the failed attempt and lock the account once the
-        // configured threshold is crossed.
-        if CONFIG.account_lockout_enabled() {
-            let decision = crate::audit::lockout::decide_after_failure(
-                true,
-                user.failed_login_count,
-                CONFIG.account_lockout_max_attempts(),
-                CONFIG.account_lockout_cooldown_seconds(),
-                Utc::now().naive_utc(),
-            );
-            user.failed_login_count = decision.new_failed_count;
-            user.locked_until = decision.new_locked_until;
-            if let Err(e) = user.save(conn).await {
-                error!("Error updating user lockout state: {e:#?}");
-            }
-            if decision.should_lock {
-                crate::audit::emit_named("user.locked", Some(&user.uuid), Some(&ip.ip.to_string()));
-            }
-        }
+        // NIST AC-7: record the failed attempt and lock the account if needed.
+        record_failed_login_attempt(&mut user, ip, conn).await;
         err!(
             "Username or password is incorrect. Try again",
             format!("IP: {}. Username: {username}.", ip.ip),

@@ -802,6 +802,7 @@ fn get_diagnostics_http(code: u16, _token: AdminToken) -> EmptyResult {
 async fn post_config(data: Json<ConfigBuilder>, token: AdminToken) -> EmptyResult {
     let data: ConfigBuilder = data.into_inner();
     if let Err(e) = CONFIG.update_config(data, true).await {
+        crate::audit::emit_named("admin.config.change_failed", None, Some(&token.ip.ip.to_string())); // NIST AU
         err!(format!("Unable to save config: {e:?}"))
     }
     crate::audit::emit_named("admin.config.changed", None, Some(&token.ip.ip.to_string())); // NIST AU audit hook (slice 2)
@@ -809,10 +810,12 @@ async fn post_config(data: Json<ConfigBuilder>, token: AdminToken) -> EmptyResul
 }
 
 #[post("/config/delete", format = "application/json")]
-async fn delete_config(_token: AdminToken) -> EmptyResult {
+async fn delete_config(token: AdminToken) -> EmptyResult {
     if let Err(e) = CONFIG.delete_user_config().await {
+        crate::audit::emit_named("admin.config.delete_failed", None, Some(&token.ip.ip.to_string())); // NIST AU
         err!(format!("Unable to delete config: {e:?}"))
     }
+    crate::audit::emit_named("admin.config.deleted", None, Some(&token.ip.ip.to_string())); // NIST AU
     Ok(())
 }
 
