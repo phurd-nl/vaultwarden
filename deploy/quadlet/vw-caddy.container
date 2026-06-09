@@ -12,10 +12,10 @@ AutoUpdate=local
 Network=vaultwarden-edge.network
 Network=vaultwarden-internal.network
 
-# Published on 8443 by default so it works under rootless podman with no sysctl
-# changes. For real port 443: set net.ipv4.ip_unprivileged_port_start=443, or run
-# these quadlets rootful, then change to 443:8443. (See deploy/README.md.)
-PublishPort=8443:8443
+# Serves on 443. Rootless bind to 443 requires
+# net.ipv4.ip_unprivileged_port_start=443 (see VM-BRINGUP.md step 0.4) or a
+# rootful install. Caddy still listens on 8443 inside the container.
+PublishPort=443:8443
 
 Volume=%h/vaultwarden/caddy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
 Volume=vw-caddy-data.volume:/data:Z

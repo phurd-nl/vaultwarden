@@ -13,7 +13,7 @@ Run everything as the **non-root service user** unless a step says `sudo`.
 Fill these in once and reuse below:
 
 ```bash
-FQDN=vault.example.internal          # <-- your real hostname
+FQDN=nextvault.nxlink.com            # NextVault production hostname (already baked into config)
 ADMIN_CIDR=10.20.5.0/24              # <-- network(s) allowed to reach /admin (space-separate multiples)
 SVC_USER=$(id -un)                  # the rootless service user (this account)
 ```
@@ -133,17 +133,16 @@ chmod 644 postgres/server.crt postgres/ca.crt caddy/server.crt ca/internal-ca.cr
 ```bash
 cd ~/vaultwarden
 
-# 4.1 DOMAIN -> your real https URL on :443
-sed -i "s#^DOMAIN=.*#DOMAIN=https://$FQDN#" config/vaultwarden.env
+# 4.1 DOMAIN and the Caddy site address are already set to nextvault.nxlink.com:443.
+#     Only change them if the hostname differs:
+grep -nE '^DOMAIN=' config/vaultwarden.env
+grep -nE ':443 \{' caddy/Caddyfile
 
-# 4.2 Caddy site address -> "$FQDN:443"
-sed -i "s#^vaultwarden.example.com:8443 {#$FQDN:443 {#" caddy/Caddyfile
-
-# 4.3 /admin allowlist -> your tight CIDR(s).
+# 4.2 /admin allowlist -> your tight CIDR(s).
 #     Replace the default RFC1918 ranges on the @admin_denied line.
 sed -i "s#not remote_ip .*#not remote_ip $ADMIN_CIDR#" caddy/Caddyfile
 
-# 4.4 Review the banner / lockout / session values in config/vaultwarden.env.
+# 4.3 Review the banner / lockout / session values in config/vaultwarden.env.
 #     Idle timeout stays OFF (no random sign-outs) unless you opt in.
 grep -nE 'DOMAIN|ACCOUNT_LOCKOUT|LOGIN_BANNER|SESSION_|AUDIT_LOG' config/vaultwarden.env
 grep -nE ':443 \{|remote_ip' caddy/Caddyfile

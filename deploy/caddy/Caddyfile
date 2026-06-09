@@ -8,9 +8,9 @@
 	}
 }
 
-# EDIT the hostname to match your DOMAIN and your internal-CA cert SAN.
-# Default port 8443 works rootless; switch to 443 once the host allows it.
-vaultwarden.example.com:8443 {
+# NextVault production hostname; must match DOMAIN and the Caddy cert SAN.
+# Serves on 443 (requires net.ipv4.ip_unprivileged_port_start=443, see runbook 0.4).
+nextvault.nxlink.com:443 {
 	tls /etc/caddy/tls/server.crt /etc/caddy/tls/server.key
 
 	# Security headers (NIST SC). HSTS only matters once you serve on 443.
