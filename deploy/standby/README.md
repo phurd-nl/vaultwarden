@@ -6,7 +6,7 @@ the "Not yet built → Warm standby + manual failover (CP-10)" item from
 
 Everything new lives in **`deploy/standby/`**. Nothing outside this directory is
 edited. The changes needed to the EXISTING primary (extra `-c` flags on the
-`vw-postgres` quadlet Exec line, one `pg_hba.conf` line, one new secret) are
+`nextvault-postgres` quadlet Exec line, one `pg_hba.conf` line, one new secret) are
 **documented here, not applied** — see *Primary-side config additions*.
 
 ## HA model (decided)
@@ -21,24 +21,24 @@ across two app instances or two databases.
 ```
    NORMAL (active)                         AFTER failover.sh (passive promoted)
    ───────────────                         ────────────────────────────────────
-   vw-caddy ─► vaultwarden:8080            vw-caddy ─► vaultwarden-standby:8080
+   nextvault-caddy ─► nextvault:8080            nextvault-caddy ─► nextvault-standby:8080
                   │                                          │
-            vw-postgres (RW)  ──stream──►  vw-postgres-standby (RO, hot standby)
+            nextvault-postgres (RW)  ──stream──►  nextvault-postgres-standby (RO, hot standby)
                   │           WAL/TLS+slot         │ pg_promote() ► RW
-            vw-data  ──data-sync.sh (rsync)──►  standby-data
+            nextvault-data  ──data-sync.sh (rsync)──►  nextvault-standby-data
 ```
 
 ## Files in this directory
 
 | File | Purpose | NIST control |
 |---|---|---|
-| `vaultwarden-standby.container` | Second app instance quadlet, byte-identical hardening to the primary; **no `[Install]`** so it is never auto-started; mounts `vw_database_url_standby`. | CP-10, AC-6, SC-8 |
-| `standby-data.volume` | The standby app's `/data` (rsync target of `vw-data`). | CP-10, MP, SC-28 |
-| `vw-postgres-standby.container` | PostgreSQL streaming **replica** (hot standby): `primary_conninfo` + physical slot over TLS `verify-full`. No `[Install]`. | CP-10, SC-8, IA-5 |
-| `standby-pgdata.volume` | Replica data dir (seeded by `pg_basebackup`, then WAL-streamed). | CP-10, MP, SC-28 |
+| `nextvault-standby.container` | Second app instance quadlet, byte-identical hardening to the primary; **no `[Install]`** so it is never auto-started; mounts `vw_database_url_standby`. | CP-10, AC-6, SC-8 |
+| `nextvault-standby-data.volume` | The standby app's `/data` (rsync target of `nextvault-data`). | CP-10, MP, SC-28 |
+| `nextvault-postgres-standby.container` | PostgreSQL streaming **replica** (hot standby): `primary_conninfo` + physical slot over TLS `verify-full`. No `[Install]`. | CP-10, SC-8, IA-5 |
+| `nextvault-standby-pgdata.volume` | Replica data dir (seeded by `pg_basebackup`, then WAL-streamed). | CP-10, MP, SC-28 |
 | `setup-replication.sh` | One-time bootstrap: creates the least-priv replication role + slot on the primary and `pg_basebackup -R` seeds the replica. | CP-10, AC-6, IA-5 |
-| `data-sync.sh` | rsync `vw-data` → `standby-data` (two-host / shared / local modes). | CP-10, MP-5 |
-| `vw-data-sync.service` / `.timer` | systemd **user** timer that runs `data-sync.sh` every 5 min. | CP-10 |
+| `data-sync.sh` | rsync `nextvault-data` → `nextvault-standby-data` (two-host / shared / local modes). | CP-10, MP-5 |
+| `nextvault-data-sync.service` / `.timer` | systemd **user** timer that runs `data-sync.sh` every 5 min. | CP-10 |
 | `failover.sh` | Guarded promote-and-cutover runbook script. | CP-10 |
 | `failback.sh` | Guarded reverse: re-seed old primary as replica, catch up, switch back. | CP-10 |
 | `Caddyfile.standby-upstream.snippet` | The exact Caddy upstream edit + reload (documented alt to the in-place `sed`). | CP-10, SC-8 |
@@ -48,9 +48,9 @@ across two app instances or two databases.
 
 | Artifact | Primary control | Why |
 |---|---|---|
-| `vw-postgres-standby.container` + `setup-replication.sh` | **CP-10** (recovery/reconstitution) | A continuously-updated copy of the DB to recover onto. |
+| `nextvault-postgres-standby.container` + `setup-replication.sh` | **CP-10** (recovery/reconstitution) | A continuously-updated copy of the DB to recover onto. |
 | `data-sync.sh` + timer | **CP-10**, MP-5 | The non-DB state (`/data`: attachments, sends, `rsa_key.pem`) is also replicated. |
-| `vaultwarden-standby.container` | **CP-10**, AC-6 | A pre-built, identically-hardened app ready to take over; least-privilege preserved. |
+| `nextvault-standby.container` | **CP-10**, AC-6 | A pre-built, identically-hardened app ready to take over; least-privilege preserved. |
 | `failover.sh` / `failback.sh` | **CP-10** | Tested, repeatable recovery and reconstitution procedures with split-brain guards. |
 | TLS `verify-full` on `primary_conninfo` + `hostssl` replication | SC-8, IA-5 | Replication traffic is encrypted and mutually validated; replication role is SCRAM, non-superuser. |
 | Distinct `vw_database_url_standby` secret | IA-5 | Failover repoints the DB without touching the primary's secret. |
@@ -66,12 +66,12 @@ across two app instances or two databases.
 
 ## Primary-side config additions (DOCUMENTED — do NOT edit existing files)
 
-The existing `deploy/quadlet/vw-postgres.container` and
+The existing `deploy/quadlet/nextvault-postgres.container` and
 `deploy/postgres/pg_hba.conf` need three small additions to support a replica.
 Apply these to your **installed** copies (`~/vaultwarden/...`) or to the repo
 files in a separate, reviewed change — they are intentionally not applied here.
 
-### 1. `vw-postgres.container` Exec flags
+### 1. `nextvault-postgres.container` Exec flags
 
 Add these `-c` flags to the existing `Exec=postgres \` block (PG 17 defaults to
 `wal_level=replica`, but pin it for clarity; senders/slots must be raised):
@@ -111,7 +111,7 @@ stores only the SCRAM verifier.
 
 The replica reuses `~/vaultwarden/tls/postgres` (so a promoted replica still
 satisfies the app's `verify-full`). In a two-host topology the server cert SAN
-**must also cover the replica's hostname** (`vw-postgres-standby`, or whatever
+**must also cover the replica's hostname** (`nextvault-postgres-standby`, or whatever
 name the app connects to after promotion). Add that SAN when you issue the cert.
 
 ### Standby `DATABASE_URL` secret
@@ -121,7 +121,7 @@ Create the standby app's DB URL once (initially pointing at the replica host;
 
 ```bash
 APP_PW=$(podman secret inspect --showsecret --format '{{.SecretData}}' vw_db_app_password)
-printf '%s' "postgresql://vaultwarden:${APP_PW}@vw-postgres-standby:5432/vaultwarden?sslmode=verify-full&sslrootcert=/etc/ssl/certs/internal-ca.crt" \
+printf '%s' "postgresql://vaultwarden:${APP_PW}@nextvault-postgres-standby:5432/vaultwarden?sslmode=verify-full&sslrootcert=/etc/ssl/certs/internal-ca.crt" \
   | podman secret create vw_database_url_standby -
 unset APP_PW
 ```
@@ -133,7 +133,7 @@ user units dir, then `daemon-reload`:
 
 ```bash
 cp deploy/standby/*.container deploy/standby/*.volume "${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd/"
-cp deploy/standby/vw-data-sync.{service,timer}        "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/"
+cp deploy/standby/nextvault-data-sync.{service,timer}        "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/"
 cp -r deploy/standby                                   "$HOME/vaultwarden/standby"   # scripts referenced by the unit
 systemctl --user daemon-reload
 chmod +x "$HOME/vaultwarden/standby/"*.sh
@@ -144,28 +144,28 @@ chmod +x "$HOME/vaultwarden/standby/"*.sh
 ## Standing up the standby (one time)
 
 ```bash
-# 0. Apply the primary-side additions above and restart vw-postgres so
+# 0. Apply the primary-side additions above and restart nextvault-postgres so
 #    wal_level/max_wal_senders/the hostssl replication line take effect.
-systemctl --user restart vw-postgres.service
+systemctl --user restart nextvault-postgres.service
 
 # 1. Create the replication role + slot on the primary and seed the replica.
 deploy/standby/setup-replication.sh
 
 # 2. Start the replica; confirm it is streaming.
-systemctl --user start vw-postgres-standby.service
-podman exec vw-postgres psql -U postgres -xc \
+systemctl --user start nextvault-postgres-standby.service
+podman exec nextvault-postgres psql -U postgres -xc \
   "SELECT client_addr,state,sync_state,replay_lag FROM pg_stat_replication;"
-podman exec vw-postgres-standby psql -U postgres -tAc 'SELECT pg_is_in_recovery();'  # => t
+podman exec nextvault-postgres-standby psql -U postgres -tAc 'SELECT pg_is_in_recovery();'  # => t
 
 # 3. Create the vw_database_url_standby secret (see above).
 
 # 4. Pick a /data topology and enable the sync timer (default MODE=twohost;
-#    EDIT vw-data-sync.service for shared/local + your STANDBY_SSH/PATH).
-systemctl --user enable --now vw-data-sync.timer
-systemctl --user start vw-data-sync.service   # first sync now
+#    EDIT nextvault-data-sync.service for shared/local + your STANDBY_SSH/PATH).
+systemctl --user enable --now nextvault-data-sync.timer
+systemctl --user start nextvault-data-sync.service   # first sync now
 ```
 
-The standby app (`vaultwarden-standby.service`) stays **stopped** — it is started
+The standby app (`nextvault-standby.service`) stays **stopped** — it is started
 only by `failover.sh`.
 
 ## `/data` replication — topologies & the consistency caveat
@@ -176,8 +176,8 @@ only by `failover.sh`.
   (shared/replicated block, NFS, etc.). No rsync; `/data` RPO = 0. Simplest
   consistency story, but the storage layer must itself be HA.
 - **`twohost`** *(default)* — primary and standby on **different hosts**;
-  `data-sync.sh` rsyncs `vw-data` over SSH into the standby host's
-  `standby-data` backing path. `/data` RPO = up to one sync interval (5 min).
+  `data-sync.sh` rsyncs `nextvault-data` over SSH into the standby host's
+  `nextvault-standby-data` backing path. `/data` RPO = up to one sync interval (5 min).
 - **`local`** — both on one host, two local volumes (useful for testing the
   failover mechanics before you have a second host).
 
@@ -206,7 +206,7 @@ unacceptable.
 |---|---|---|
 | **RTO** (time to restore service) | `____` (e.g. ≤ 15 min) | Measured wall-clock for `failover.sh` from invocation to validated service. |
 | **RPO — database** | `____` (e.g. ≤ a few seconds) | Bounded by streaming replication lag at failure. ~0 if the primary was reachable for a final flush; otherwise the un-streamed WAL tail. |
-| **RPO — `/data`** | `____` (e.g. ≤ 5 min) | Bounded by the `vw-data-sync.timer` interval, unless `MODE=shared` (RPO 0) or a successful final sync. |
+| **RPO — `/data`** | `____` (e.g. ≤ 5 min) | Bounded by the `nextvault-data-sync.timer` interval, unless `MODE=shared` (RPO 0) or a successful final sync. |
 
 Fill these from the acceptance drill below; CP-10 expects documented, *tested*
 objectives, not aspirational ones.
@@ -221,7 +221,7 @@ lost or must be taken down. (NIST CP-10.)
 **Preconditions**
 - Replica is streaming and caught up: `pg_stat_replication.state = 'streaming'`,
   replay lag within `MAX_LAG_BYTES` (default 16 MiB).
-- `vw-data-sync.timer` has been running (recent successful sync).
+- `nextvault-data-sync.timer` has been running (recent successful sync).
 - `vw_database_url_standby` secret exists.
 - You have decided failover is warranted (primary down, or planned).
 
@@ -237,15 +237,15 @@ lost or must be taken down. (NIST CP-10.)
    ```
    It will, with typed confirmations: check replica health → **stop the old
    primary app** (fence) → final `/data` sync (best effort) → `pg_promote()` →
-   repoint `vw_database_url_standby` → start `vaultwarden-standby` → switch the
-   Caddy upstream to `vaultwarden-standby:8080` and reload → run `verify.sh`.
+   repoint `vw_database_url_standby` → start `nextvault-standby` → switch the
+   Caddy upstream to `nextvault-standby:8080` and reload → run `verify.sh`.
 3. If the primary HOST is gone, run on the standby host; the fence step is a
    no-op (already down) and the final sync will warn — record the `/data` gap.
 
 **Validation** (do all; this is the CP-10 evidence)
 - `verify.sh` passes (TLS reachable, signups disabled, **WebSocket → 101**, no
   published DB port).
-- Promoted DB is writable: `podman exec vw-postgres-standby psql -U postgres -tAc
+- Promoted DB is writable: `podman exec nextvault-postgres-standby psql -U postgres -tAc
   'SELECT pg_is_in_recovery();'` → `f`.
 - **WebSocket reconnect:** log in to the web vault; the client shows "connected";
   edit an item on a second device and watch it sync live (proves `/notifications/hub`
@@ -254,12 +254,12 @@ lost or must be taken down. (NIST CP-10.)
   Send (proves `/data` synced and `rsa_key.pem` matches).
 - **Concurrent editing:** two clients edit different items simultaneously; both
   save without conflict errors.
-- `vw-caddy` access log shows upstream `vaultwarden-standby:8080`.
+- `nextvault-caddy` access log shows upstream `nextvault-standby:8080`.
 
 **Expected logs / evidence**
-- `vw-postgres-standby`: `database system is ready to accept connections` and a
+- `nextvault-postgres-standby`: `database system is ready to accept connections` and a
   promotion line (`received promote request` / `selected new timeline ID`).
-- `vaultwarden-standby`: DB connection established + `vaultwarden::audit` lines on
+- `nextvault-standby`: DB connection established + `nextvault::audit` lines on
   the first login.
 - Saved Caddyfile backup `Caddyfile.pre-failover.<ts>`.
 
@@ -267,9 +267,9 @@ lost or must be taken down. (NIST CP-10.)
 - If promotion succeeded but cutover failed, the safest path is to finish cutover
   (the DB is already promoted; you cannot un-promote without a re-seed).
 - If you must abort BEFORE promotion: restart the primary app
-  (`systemctl --user start vaultwarden.service`), leave the replica streaming, and
+  (`systemctl --user start nextvault.service`), leave the replica streaming, and
   restore the Caddyfile from the `.pre-failover.<ts>` backup, then
-  `podman exec vw-caddy caddy reload --config /etc/caddy/Caddyfile`.
+  `podman exec nextvault-caddy caddy reload --config /etc/caddy/Caddyfile`.
 
 **Escalation**
 - DB will not promote / replica corrupt → fall back to the `deploy/backup/`
@@ -303,17 +303,17 @@ switches in the reverse direction.
    ```bash
    deploy/standby/failback.sh
    ```
-   With confirmations it: re-seeds `vw-pgdata` from the standby (`pg_basebackup`,
+   With confirmations it: re-seeds `nextvault-pgdata` from the standby (`pg_basebackup`,
    **destructive**) → starts the old primary as a streaming replica → waits for
    catch-up → **stops the standby app** (write freeze) → reverse `/data` sync →
    `pg_promote()` the original primary → repoint `vw_database_url` → start
-   `vaultwarden` → switch Caddy upstream back to `vaultwarden:8080` and reload.
+   `nextvault` → switch Caddy upstream back to `nextvault:8080` and reload.
 3. Re-establish protection (script prints the commands): re-seed the standby DB
-   as a replica again and re-enable `vw-data-sync.timer`.
+   as a replica again and re-enable `nextvault-data-sync.timer`.
 
 **Validation** — same checklist as failover (login, WebSocket 101 + live sync,
-attachment, Send, concurrent edit), plus: `vw-caddy` access log shows upstream
-`vaultwarden:8080` again, and `vw-postgres-standby` is back in recovery
+attachment, Send, concurrent edit), plus: `nextvault-caddy` access log shows upstream
+`nextvault:8080` again, and `nextvault-postgres-standby` is back in recovery
 (streaming) once re-established.
 
 **Rollback** — if catch-up never completes or promotion of the original fails,
@@ -331,11 +331,11 @@ Each must pass; record results + timings and use them to fill the RTO/RPO table.
 
 | # | Test | Pass criterion |
 |---|---|---|
-| 1 | **Restart active app** — `systemctl --user restart vaultwarden.service` | Service returns; clients reconnect; WebSocket → 101; no data loss. |
-| 2 | **Kill active app** — `systemctl --user stop vaultwarden.service` (no failover) | Caddy returns 502 for the primary upstream; standby is NOT auto-serving (proves active-passive, manual). |
+| 1 | **Restart active app** — `systemctl --user restart nextvault.service` | Service returns; clients reconnect; WebSocket → 101; no data loss. |
+| 2 | **Kill active app** — `systemctl --user stop nextvault.service` (no failover) | Caddy returns 502 for the primary upstream; standby is NOT auto-serving (proves active-passive, manual). |
 | 3 | **Fail over** — `failover.sh` | Standby promoted + serving; full validation checklist passes; RTO recorded. |
 | 4 | **Fail back** — `failback.sh` | Original primary serving again; replica re-established; validation passes. |
-| 5 | **Fail DB primary** — `systemctl --user stop vw-postgres.service`, then `failover.sh` | Promotion succeeds on whatever WAL the replica had; DB RPO = streamed lag at stop; service restored on the standby. |
+| 5 | **Fail DB primary** — `systemctl --user stop nextvault-postgres.service`, then `failover.sh` | Promotion succeeds on whatever WAL the replica had; DB RPO = streamed lag at stop; service restored on the standby. |
 | 6 | **Concurrent editing** — two authenticated clients edit different items at once, before and after a failover | Both edits persist; live sync via WebSocket works on both; no split-brain (single live DB throughout). |
 
 Drill in a **staging copy** of the stack first; production drills require a
@@ -345,7 +345,7 @@ maintenance window.
 
 - **One writer, always.** The standby app has no `[Install]` and the replica is
   read-only until promoted. `failover.sh` fences the old primary app before
-  promoting. Do not start `vaultwarden-standby.service` by hand against the
+  promoting. Do not start `nextvault-standby.service` by hand against the
   read-only replica — it will fail to write and may confuse clients.
 - **Image/version parity.** Replica and primary Postgres **major versions must
   match** for streaming; pin the same digest. The two app instances must run the
@@ -357,7 +357,7 @@ maintenance window.
 - **`config.json` drift.** As in the base deployment, don't change settings via
   `/admin`; the env file is the source of truth. A `config.json` synced in `/data`
   is treated as drift on both sides.
-- **Timer collision.** `vw-data-sync.timer` (every 5 min) is randomized 30s and
+- **Timer collision.** `nextvault-data-sync.timer` (every 5 min) is randomized 30s and
   is `Nice`/`idle`-scheduled so it never contends with the 03:17 backup timer.
 - **This composes with `deploy/backup/`.** Streaming replication is *not* a
   backup (a bad `DELETE` replicates instantly). Keep CP-9 backups + PITR as the

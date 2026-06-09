@@ -1,14 +1,14 @@
 [Unit]
 Description=PostgreSQL for Vaultwarden (TLS, least-privilege app role)
-Requires=vw-pgdata-volume.service vaultwarden-internal-network.service
-After=vw-pgdata-volume.service vaultwarden-internal-network.service
+Requires=nextvault-pgdata-volume.service nextvault-internal-network.service
+After=nextvault-pgdata-volume.service nextvault-internal-network.service
 
 [Container]
-ContainerName=vw-postgres
+ContainerName=nextvault-postgres
 # NIST CM-2/SR: pin by digest in production. Replace the tag with image@sha256:...
 Image=docker.io/library/postgres:17.5
 AutoUpdate=local
-Network=vaultwarden-internal.network
+Network=nextvault-internal.network
 # DB is reachable ONLY on the internal network — never published to the host.
 
 # --- Bootstrap (superuser is used only for init; the app uses a least-priv role) ---
@@ -19,10 +19,10 @@ Secret=vw_pg_superuser_password,type=env,target=POSTGRES_PASSWORD
 # App-role password is exposed to the init script as a mounted file (see init/01-app-role.sh).
 Secret=vw_db_app_password,type=mount,mode=0444
 
-Volume=vw-pgdata.volume:/var/lib/postgresql/data:Z
+Volume=nextvault-pgdata.volume:/var/lib/postgresql/data:Z
 Volume=%h/vaultwarden/postgres/init:/docker-entrypoint-initdb.d:ro,Z
 # TLS material from your internal/enterprise CA. The server cert SAN MUST include
-# the hostname "vw-postgres" so the app's sslmode=verify-full succeeds.
+# the hostname "nextvault-postgres" so the app's sslmode=verify-full succeeds.
 Volume=%h/vaultwarden/tls/postgres:/etc/postgresql/tls:ro,Z
 Volume=%h/vaultwarden/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro,Z
 

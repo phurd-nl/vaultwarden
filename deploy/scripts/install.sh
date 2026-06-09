@@ -15,7 +15,7 @@ mkdir -p "$DEST"
 cp -r "$SRC/config"      "$DEST/"
 cp -r "$SRC/caddy"       "$DEST/"
 cp -r "$SRC/postgres"    "$DEST/"
-# Egress allowlist proxy config (SSO -> Entra), mounted by vw-egress-proxy.
+# Egress allowlist proxy config (SSO -> Entra), mounted by nextvault-egress-proxy.
 cp -r "$SRC/egress-proxy" "$DEST/"
 # TLS dirs are created empty; you drop your internal-CA material in (see tls/README.md).
 mkdir -p "$DEST/tls/ca" "$DEST/tls/postgres" "$DEST/tls/caddy"
@@ -34,7 +34,7 @@ Installed. Next:
   1) Drop internal-CA TLS material in $DEST/tls/   (see deploy/tls/README.md)
   2) deploy/secrets/create-secrets.sh              (then set vw_admin_token)
   3) deploy/scripts/build-image.sh                 (build the fork image)
-  4) systemctl --user start vw-caddy.service       (pulls up the dependency chain)
+  4) systemctl --user start nextvault-caddy.service       (pulls up the dependency chain)
   5) deploy/scripts/verify.sh                      (acceptance checks)
 
 Tip: 'loginctl enable-linger \$USER' keeps the services running after logout.

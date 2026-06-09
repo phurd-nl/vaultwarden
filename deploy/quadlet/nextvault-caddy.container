@@ -1,16 +1,16 @@
 [Unit]
 Description=Caddy reverse proxy / TLS termination for Vaultwarden
-Requires=vaultwarden-edge-network.service vaultwarden-internal-network.service vaultwarden.service
-After=vaultwarden-edge-network.service vaultwarden-internal-network.service vaultwarden.service
+Requires=nextvault-edge-network.service nextvault-internal-network.service nextvault.service
+After=nextvault-edge-network.service nextvault-internal-network.service nextvault.service
 
 [Container]
-ContainerName=vw-caddy
+ContainerName=nextvault-caddy
 # NIST CM-2/SR: pin by digest in production.
 Image=docker.io/library/caddy:2.8
 AutoUpdate=local
 # Caddy is the ONLY container on both networks: edge (ingress) + internal (to app).
-Network=vaultwarden-edge.network
-Network=vaultwarden-internal.network
+Network=nextvault-edge.network
+Network=nextvault-internal.network
 
 # Serves on 443. Rootless bind to 443 requires
 # net.ipv4.ip_unprivileged_port_start=443 (see VM-BRINGUP.md step 0.4) or a
@@ -18,7 +18,7 @@ Network=vaultwarden-internal.network
 PublishPort=443:8443
 
 Volume=%h/vaultwarden/caddy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
-Volume=vw-caddy-data.volume:/data:Z
+Volume=nextvault-caddy-data.volume:/data:Z
 # TLS server cert/key issued by your internal/enterprise CA (SAN = your DOMAIN).
 Volume=%h/vaultwarden/tls/caddy:/etc/caddy/tls:ro,Z
 

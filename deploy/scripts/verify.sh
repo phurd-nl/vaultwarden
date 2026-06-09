@@ -32,14 +32,14 @@ ws="$("${CURL[@]}" -o /dev/null -w '%{http_code}' \
 
 echo "== Audit log emitting (NIST AU) =="
 "${CURL[@]}" -o /dev/null "$BASE/admin" 2>/dev/null || true
-if podman logs vaultwarden 2>&1 | grep -q 'vaultwarden::audit'; then
-	ok "audit records present on vaultwarden::audit target"
+if podman logs nextvault 2>&1 | grep -q 'nextvault::audit'; then
+	ok "audit records present on nextvault::audit target"
 else
-	echo "  WARN: no audit lines yet (trigger a login, then re-check 'podman logs vaultwarden')"
+	echo "  WARN: no audit lines yet (trigger a login, then re-check 'podman logs nextvault')"
 fi
 
 echo "== PostgreSQL not published to host (NIST SC) =="
-if podman port vw-postgres 2>/dev/null | grep -q .; then
+if podman port nextvault-postgres 2>/dev/null | grep -q .; then
 	bad "postgres has a published host port"
 else
 	ok "postgres has no host port mapping"

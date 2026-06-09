@@ -19,34 +19,34 @@
 #   5. FINAL /data sync in REVERSE (standby /data -> primary /data).
 #   6. PROMOTE the old primary (now caught up) back to primary.
 #   7. Repoint the PRIMARY app DATABASE_URL at the promoted original DB; start it.
-#   8. SWITCH Caddy upstream back to vaultwarden:8080; reload.
+#   8. SWITCH Caddy upstream back to nextvault:8080; reload.
 #   9. VALIDATE; re-establish the standby (standby becomes the replica again).
 #
 # This is a PLANNED maintenance operation — schedule a brief write-freeze window.
 # =============================================================================
 set -euo pipefail
 
-PRIMARY_APP="${PRIMARY_APP:-vaultwarden}"
-STANDBY_APP="${STANDBY_APP:-vaultwarden-standby}"
-PRIMARY_DB="${PRIMARY_DB:-vw-postgres}"
-STANDBY_DB="${STANDBY_DB:-vw-postgres-standby}"
+PRIMARY_APP="${PRIMARY_APP:-nextvault}"
+STANDBY_APP="${STANDBY_APP:-nextvault-standby}"
+PRIMARY_DB="${PRIMARY_DB:-nextvault-postgres}"
+STANDBY_DB="${STANDBY_DB:-nextvault-postgres-standby}"
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
 PG_IMAGE="${PG_IMAGE:-docker.io/library/postgres:17.5}"
-PG_NETWORK="${PG_NETWORK:-vaultwarden-internal.network}"
+PG_NETWORK="${PG_NETWORK:-nextvault-internal.network}"
 DB_NAME="${DB_NAME:-vaultwarden}"
 DB_USER="${DB_USER:-vaultwarden}"
-PRIMARY_DB_HOST="${PRIMARY_DB_HOST:-vw-postgres}"
-STANDBY_DB_HOST="${STANDBY_DB_HOST:-vw-postgres-standby}"   # cert SAN must cover this
+PRIMARY_DB_HOST="${PRIMARY_DB_HOST:-nextvault-postgres}"
+STANDBY_DB_HOST="${STANDBY_DB_HOST:-nextvault-postgres-standby}"   # cert SAN must cover this
 REPL_ROLE="${REPL_ROLE:-vw_replicator}"
 REPL_SLOT_BACK="${REPL_SLOT_BACK:-vw_failback_slot}"
 REPL_PW_SECRET="${REPL_PW_SECRET:-vw_replication_password}"
 DB_URL_PRIMARY_SECRET="${DB_URL_PRIMARY_SECRET:-vw_database_url}"
 APP_PW_SECRET="${APP_PW_SECRET:-vw_db_app_password}"
-PRIMARY_PGDATA_VOL="${PRIMARY_PGDATA_VOL:-vw-pgdata}"
+PRIMARY_PGDATA_VOL="${PRIMARY_PGDATA_VOL:-nextvault-pgdata}"
 CA_PATH_IN_APP="${CA_PATH_IN_APP:-/etc/ssl/certs/internal-ca.crt}"
 CA_IN_CONTAINER="/etc/ssl/certs/internal-ca.crt"
 CADDYFILE="${CADDYFILE:-$HOME/vaultwarden/caddy/Caddyfile}"
-CADDY_CONTAINER="${CADDY_CONTAINER:-vw-caddy}"
+CADDY_CONTAINER="${CADDY_CONTAINER:-nextvault-caddy}"
 MAX_LAG_BYTES="${MAX_LAG_BYTES:-16777216}"
 SC="systemctl --user"
 
@@ -121,7 +121,7 @@ step "5. FINAL /data sync in REVERSE (standby -> primary)"
 if [[ -x "$(dirname "$0")/data-sync.sh" ]]; then
   # Reverse direction: swap src/dst via env. Operator must set the reverse SSH
   # target; document in the incident plan. Best effort.
-  SRC_VOLUME=standby-data DST_VOLUME=vw-data MODE="${FAILBACK_SYNC_MODE:-local}" \
+  SRC_VOLUME=nextvault-standby-data DST_VOLUME=nextvault-data MODE="${FAILBACK_SYNC_MODE:-local}" \
     "$(dirname "$0")/data-sync.sh" || log "WARNING: reverse /data sync failed — verify /data manually."
 else
   log "data-sync.sh not found — sync /data standby->primary manually before promoting."
@@ -148,11 +148,11 @@ $SC start "${PRIMARY_APP}.service" || die "failed to start ${PRIMARY_APP}.servic
 log "primary app restarted against the promoted original DB"
 
 step "8. SWITCH Caddy upstream back to the primary"
-if grep -q 'reverse_proxy vaultwarden-standby:8080' "$CADDYFILE"; then
+if grep -q 'reverse_proxy nextvault-standby:8080' "$CADDYFILE"; then
   cp -a "$CADDYFILE" "${CADDYFILE}.pre-failback.$(date -u +%Y%m%dT%H%M%SZ)"
-  sed -i 's/reverse_proxy vaultwarden-standby:8080/reverse_proxy vaultwarden:8080/g' "$CADDYFILE"
-  grep -q 'reverse_proxy vaultwarden:8080' "$CADDYFILE" || die "Caddyfile rewrite back failed — edit manually."
-  log "Caddyfile upstream restored to vaultwarden:8080 (backup saved)"
+  sed -i 's/reverse_proxy nextvault-standby:8080/reverse_proxy nextvault:8080/g' "$CADDYFILE"
+  grep -q 'reverse_proxy nextvault:8080' "$CADDYFILE" || die "Caddyfile rewrite back failed — edit manually."
+  log "Caddyfile upstream restored to nextvault:8080 (backup saved)"
 else
   log "Caddyfile already points at the primary upstream"
 fi
@@ -164,14 +164,14 @@ fi
 
 step "9. RE-ESTABLISH the standby as a replica of the restored primary"
 log "Now rebuild the standby DB as a replica again so you are protected:"
-log "  systemctl --user stop vw-postgres-standby.service"
+log "  systemctl --user stop nextvault-postgres-standby.service"
 log "  ./setup-replication.sh --reseed        # standby re-seeds from the primary"
-log "  systemctl --user start vw-postgres-standby.service"
-log "  systemctl --user start vw-data-sync.timer   # resume forward /data sync"
+log "  systemctl --user start nextvault-postgres-standby.service"
+log "  systemctl --user start nextvault-data-sync.timer   # resume forward /data sync"
 cat <<'EOF'
 
   VALIDATE (see README "Validation"): log in, WebSocket 101 + live sync,
   open an attachment, create/download a Send, concurrent edit on two clients,
-  and confirm vw-caddy access log shows upstream vaultwarden:8080 again.
+  and confirm nextvault-caddy access log shows upstream nextvault:8080 again.
 EOF
 log "FAILBACK COMPLETE. Confirm streaming replication is healthy before closing the incident."

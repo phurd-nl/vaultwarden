@@ -2,7 +2,7 @@
 Description=Vaultwarden edge network (Caddy <-> host ingress)
 
 [Network]
-NetworkName=vaultwarden-edge
+NetworkName=nextvault-edge
 # Egress-capable bridge used only by Caddy for published ingress ports.
 # Caddy is the only container attached to both edge and internal networks.
 Subnet=10.89.11.0/24

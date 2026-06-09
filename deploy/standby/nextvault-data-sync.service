@@ -10,6 +10,6 @@ Type=oneshot
 # EDIT MODE for your topology (twohost|shared|local) and the STANDBY_SSH/PATH.
 Environment=MODE=twohost
 ExecStart=%h/vaultwarden/standby/data-sync.sh
-# Read-only against vw-data; never blocks the live app.
+# Read-only against nextvault-data; never blocks the live app.
 Nice=10
 IOSchedulingClass=idle

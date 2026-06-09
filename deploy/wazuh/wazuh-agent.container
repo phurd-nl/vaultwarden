@@ -2,8 +2,8 @@
 Description=Wazuh agent sidecar — log shipping + alerting for Vaultwarden (NIST AU-6/SI-4/IR-4)
 # Start after the stack so there is something to read. The agent does not gate
 # the app: if Wazuh is down the app keeps serving (AU-5 graceful degradation).
-After=vaultwarden.service vw-caddy.service vw-postgres.service
-Wants=vaultwarden.service
+After=nextvault.service nextvault-caddy.service nextvault-postgres.service
+Wants=nextvault.service
 
 [Container]
 ContainerName=wazuh-agent
@@ -13,7 +13,7 @@ Image=docker.io/wazuh/wazuh-agent:4.9.2
 AutoUpdate=local
 # The agent ships logs OUTBOUND to the manager only; it needs egress, so it
 # lives on the edge network, NOT the internal one (SC-7 keeps it off the DB net).
-Network=vaultwarden-edge.network
+Network=nextvault-edge.network
 
 # --- Manager / enrollment (operator fills these at deploy) ---
 # WAZUH_MANAGER + WAZUH_REGISTRATION_SERVER: DNS/IP of your Wazuh manager.

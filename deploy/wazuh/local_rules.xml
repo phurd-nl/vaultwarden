@@ -12,7 +12,7 @@
   ts/event_name/(user_uuid)/(ip) only; EventType events (emit) also carry
   event_type/user_uuid/act_user_uuid/etc.
 -->
-<group name="vaultwarden,nist,audit,">
+<group name="nextvault,nist,audit,">
 
   <!-- ============================================================= -->
   <!-- Parent: any decoded Vaultwarden audit JSON line.              -->
@@ -147,7 +147,7 @@
 <!-- alongside app admin.login.* — NIST AC-6/SC-7). Caddy access logs   -->
 <!-- are JSON; fields are request.uri, request.remote_ip, status.       -->
 <!-- ================================================================= -->
-<group name="vaultwarden,caddy,nist,">
+<group name="nextvault,caddy,nist,">
 
   <rule id="100100" level="0">
     <decoded_as>json</decoded_as>
@@ -179,12 +179,12 @@
 
 <!-- ================================================================= -->
 <!-- PostgreSQL: DB authentication failures (NIST AC-7/IA-5/AU-6).     -->
-<!-- Decoded by vw-postgres* decoders in local_decoder.xml.            -->
+<!-- Decoded by nextvault-postgres* decoders in local_decoder.xml.            -->
 <!-- ================================================================= -->
-<group name="vaultwarden,postgres,nist,">
+<group name="nextvault,postgres,nist,">
 
   <rule id="100200" level="0">
-    <decoded_as>vw-postgres</decoded_as>
+    <decoded_as>nextvault-postgres</decoded_as>
     <description>PostgreSQL log line (base rule)</description>
   </rule>
 
@@ -192,7 +192,7 @@
        and is a strong tampering / lateral-movement signal. -->
   <rule id="100201" level="10">
     <if_sid>100200</if_sid>
-    <decoded_as>vw-postgres-auth-fail</decoded_as>
+    <decoded_as>nextvault-postgres-auth-fail</decoded_as>
     <description>PostgreSQL authentication FAILURE for user $(dstuser)</description>
     <mitre>
       <id>T1110</id>
@@ -215,7 +215,7 @@
        Signals a policy-violating connection reaching the DB (SC-7/SC-8). -->
   <rule id="100203" level="9">
     <if_sid>100200</if_sid>
-    <decoded_as>vw-postgres-no-pg_hba</decoded_as>
+    <decoded_as>nextvault-postgres-no-pg_hba</decoded_as>
     <description>PostgreSQL connection rejected by pg_hba policy (TLS/client-cert/entry)</description>
     <mitre>
       <id>T1190</id>

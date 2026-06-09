@@ -1,20 +1,20 @@
 [Unit]
 Description=Vaultwarden (NIST 800-53B Moderate hardened fork)
-Requires=vw-data-volume.service vaultwarden-internal-network.service vw-postgres.service
-After=vw-data-volume.service vaultwarden-internal-network.service vw-postgres.service
+Requires=nextvault-data-volume.service nextvault-internal-network.service nextvault-postgres.service
+After=nextvault-data-volume.service nextvault-internal-network.service nextvault-postgres.service
 # SSO (Entra) egress goes through the allowlist proxy. Want it up first so the
 # first SSO login does not race the proxy; not a hard Requires (the app serves
 # without it, SSO just fails until the proxy is up).
-Wants=vw-egress-proxy.service
-After=vw-egress-proxy.service
+Wants=nextvault-egress-proxy.service
+After=nextvault-egress-proxy.service
 
 [Container]
-ContainerName=vaultwarden
+ContainerName=nextvault
 # Built locally from this fork (see deploy/scripts/build-image.sh).
-# NIST CM-2/SR: pin by digest in production (localhost/vaultwarden-nist@sha256:...).
-Image=localhost/vaultwarden-nist:latest
+# NIST CM-2/SR: pin by digest in production (localhost/nextvault@sha256:...).
+Image=localhost/nextvault:latest
 AutoUpdate=local
-Network=vaultwarden-internal.network
+Network=nextvault-internal.network
 
 # Non-secret configuration as code (NIST CM).
 EnvironmentFile=%h/vaultwarden/config/vaultwarden.env
@@ -36,9 +36,9 @@ Environment=SSO_CLIENT_SECRET_FILE=/run/secrets/vw_sso_client_secret
 # Postgres connection is raw TCP and unaffected by these anyway).
 Environment=HTTP_PROXY=http://10.89.10.200:8888
 Environment=HTTPS_PROXY=http://10.89.10.200:8888
-Environment=NO_PROXY=localhost,127.0.0.1,vw-postgres,10.89.10.0/24
+Environment=NO_PROXY=localhost,127.0.0.1,nextvault-postgres,10.89.10.0/24
 
-Volume=vw-data.volume:/data:Z
+Volume=nextvault-data.volume:/data:Z
 # Internal CA cert so the app validates the PostgreSQL server cert (sslmode=verify-full).
 Volume=%h/vaultwarden/tls/ca/internal-ca.crt:/etc/ssl/certs/internal-ca.crt:ro,Z
 

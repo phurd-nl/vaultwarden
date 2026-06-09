@@ -7,12 +7,12 @@
 # runs ONLY when an operator invokes it, and every destructive step is behind a
 # typed confirmation. It does, in order:
 #   1. PRECONDITIONS — confirm the standby DB replica is healthy and caught up.
-#   2. FENCE the old primary app — stop vaultwarden.service so there is never
+#   2. FENCE the old primary app — stop nextvault.service so there is never
 #      more than one writer (split-brain prevention).
 #   3. FINAL /data sync if the primary host is still reachable (shrink /data RPO).
 #   4. PROMOTE the replica — pg_promote(); wait until it leaves recovery.
 #   5. REPOINT the standby app's DATABASE_URL secret at the promoted DB.
-#   6. START the standby app (vaultwarden-standby.service).
+#   6. START the standby app (nextvault-standby.service).
 #   7. SWITCH Caddy upstream to the standby and reload.
 #   8. VALIDATE (delegates to verify.sh; reminds about WebSocket/attachments).
 #
@@ -20,23 +20,23 @@
 # Idempotent-ish: each step checks current state before acting.
 #
 # REQUIRED ACCESS: rootless deploy user; podman; ability to edit the Caddyfile
-# and reload vw-caddy; the vw_database_url_standby secret.
+# and reload nextvault-caddy; the vw_database_url_standby secret.
 # =============================================================================
 set -euo pipefail
 
-PRIMARY_APP="${PRIMARY_APP:-vaultwarden}"
-STANDBY_APP="${STANDBY_APP:-vaultwarden-standby}"
-PRIMARY_DB="${PRIMARY_DB:-vw-postgres}"
-STANDBY_DB="${STANDBY_DB:-vw-postgres-standby}"
+PRIMARY_APP="${PRIMARY_APP:-nextvault}"
+STANDBY_APP="${STANDBY_APP:-nextvault-standby}"
+PRIMARY_DB="${PRIMARY_DB:-nextvault-postgres}"
+STANDBY_DB="${STANDBY_DB:-nextvault-postgres-standby}"
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
 DB_NAME="${DB_NAME:-vaultwarden}"
 DB_USER="${DB_USER:-vaultwarden}"
-STANDBY_DB_HOST="${STANDBY_DB_HOST:-vw-postgres-standby}"   # cert SAN must cover this
+STANDBY_DB_HOST="${STANDBY_DB_HOST:-nextvault-postgres-standby}"   # cert SAN must cover this
 DB_URL_STANDBY_SECRET="${DB_URL_STANDBY_SECRET:-vw_database_url_standby}"
 APP_PW_SECRET="${APP_PW_SECRET:-vw_db_app_password}"
 CA_PATH_IN_APP="${CA_PATH_IN_APP:-/etc/ssl/certs/internal-ca.crt}"
 CADDYFILE="${CADDYFILE:-$HOME/vaultwarden/caddy/Caddyfile}"
-CADDY_CONTAINER="${CADDY_CONTAINER:-vw-caddy}"
+CADDY_CONTAINER="${CADDY_CONTAINER:-nextvault-caddy}"
 MAX_LAG_BYTES="${MAX_LAG_BYTES:-16777216}"        # 16 MiB acceptable replay lag
 RUN_FINAL_SYNC="${RUN_FINAL_SYNC:-1}"
 SC="systemctl --user"
@@ -131,21 +131,21 @@ log "standby app '$STANDBY_APP' is running"
 
 step "7. SWITCH Caddy upstream to the standby"
 # Repoint reverse_proxy targets from the primary app name to the standby. The
-# Caddyfile uses 'vaultwarden:8080'; the standby listens as 'vaultwarden-standby:8080'.
-if grep -q 'vaultwarden-standby:8080' "$CADDYFILE"; then
+# Caddyfile uses 'nextvault:8080'; the standby listens as 'nextvault-standby:8080'.
+if grep -q 'nextvault-standby:8080' "$CADDYFILE"; then
   log "Caddyfile already points at the standby upstream"
 else
   cp -a "$CADDYFILE" "${CADDYFILE}.pre-failover.$(date -u +%Y%m%dT%H%M%SZ)"
   # Only the bare upstream token, not the site address / comments.
-  sed -i 's/reverse_proxy vaultwarden:8080/reverse_proxy vaultwarden-standby:8080/g' "$CADDYFILE"
-  grep -q 'vaultwarden-standby:8080' "$CADDYFILE" || die "Caddyfile rewrite did not take — edit it manually."
-  log "Caddyfile upstream switched to vaultwarden-standby:8080 (backup saved)"
+  sed -i 's/reverse_proxy nextvault:8080/reverse_proxy nextvault-standby:8080/g' "$CADDYFILE"
+  grep -q 'nextvault-standby:8080' "$CADDYFILE" || die "Caddyfile rewrite did not take — edit it manually."
+  log "Caddyfile upstream switched to nextvault-standby:8080 (backup saved)"
 fi
 # Reload Caddy in place (no downtime) — it must be able to resolve the standby
-# container name on the internal network (it is, both are on vaultwarden-internal).
+# container name on the internal network (it is, both are on nextvault-internal).
 if podman container exists "$CADDY_CONTAINER" 2>/dev/null; then
   podman exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile 2>/dev/null \
-    || { log "caddy reload failed; restarting vw-caddy"; $SC restart "${CADDY_CONTAINER}.service" || die "could not reload or restart Caddy"; }
+    || { log "caddy reload failed; restarting nextvault-caddy"; $SC restart "${CADDY_CONTAINER}.service" || die "could not reload or restart Caddy"; }
   log "Caddy reloaded with the standby upstream"
 else
   log "WARNING: '$CADDY_CONTAINER' not running on this host. Start/redeploy Caddy here, or update the active Caddy host's upstream manually."
@@ -166,10 +166,10 @@ cat <<'EOF'
         "connected" (edit an item on another device, see it sync live).
     [ ] Open an existing ATTACHMENT and create+download a SEND (proves /data synced).
     [ ] Two clients edit different items concurrently; both save without error.
-    [ ] podman logs vaultwarden-standby shows DB connected + audit lines.
+    [ ] podman logs nextvault-standby shows DB connected + audit lines.
 
-  EXPECTED EVIDENCE: pg_is_in_recovery()='f' on the promoted DB; vw-caddy access
-  log shows upstream vaultwarden-standby:8080; standby app audit lines present.
+  EXPECTED EVIDENCE: pg_is_in_recovery()='f' on the promoted DB; nextvault-caddy access
+  log shows upstream nextvault-standby:8080; standby app audit lines present.
 EOF
 log "FAILOVER COMPLETE. Record RTO actual + /data RPO gap in the incident log."
 log "When the original primary is repaired, use failback.sh to return to it."

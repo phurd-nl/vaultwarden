@@ -15,7 +15,7 @@ FORCE=0
 [[ "${1:-}" == "--force" ]] && FORCE=1
 
 # EDIT to match deploy/config/vaultwarden.env DOMAIN host and the cert SAN.
-DB_HOST="vw-postgres"
+DB_HOST="nextvault-postgres"
 DB_NAME="vaultwarden"
 DB_USER="vaultwarden"
 CA_PATH_IN_APP="/etc/ssl/certs/internal-ca.crt"
@@ -51,7 +51,7 @@ DB secrets created. Now set the admin token yourself (NIST IA-5):
 
   # Generate an Argon2id PHC string interactively and store it as a secret.
   # 'vaultwarden hash' prompts for the token and prints the PHC.
-  podman run --rm -it localhost/vaultwarden-nist:latest /vaultwarden hash \
+  podman run --rm -it localhost/nextvault:latest /vaultwarden hash \
     | tail -n1 | podman secret create vw_admin_token -
 
   # Keep the PLAINTEXT token in your password manager — you type it at /admin.

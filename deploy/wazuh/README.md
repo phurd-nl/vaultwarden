@@ -7,9 +7,9 @@ external **Wazuh manager**, which runs the decoders/rules in this directory and
 raises alerts.
 
 ```
-  vaultwarden  ┐
-  vw-caddy     ├─ stdout ─▶ host journald ─▶ wazuh-agent (sidecar) ──TCP 1514──▶ Wazuh manager
-  vw-postgres  ┘                              reads journald,            (decoders+rules+alerts)
+  nextvault    ┐
+  nextvault-caddy     ├─ stdout ─▶ host journald ─▶ wazuh-agent (sidecar) ──TCP 1514──▶ Wazuh manager
+  nextvault-postgres  ┘                              reads journald,            (decoders+rules+alerts)
                                               forwards by CONTAINER_NAME
 ```
 
@@ -40,8 +40,8 @@ agent read-only against the log source.
 
 These quadlets live outside `deploy/wazuh/` so this slice does **not** edit them.
 Before enabling the agent, add one line to the `[Container]` section of each of
-`deploy/quadlet/vaultwarden.container`, `vw-caddy.container`, and
-`vw-postgres.container`:
+`deploy/quadlet/nextvault.container`, `nextvault-caddy.container`, and
+`nextvault-postgres.container`:
 
 ```ini
 LogDriver=journald
@@ -145,15 +145,15 @@ tail -f /var/ossec/logs/alerts/alerts.json | grep -Eo '"id":"10[0-9]{4}"'
 | 100010 / 100011 | Fail one user's login past `LOCKOUT_MAX_RETRIES`; then try again while locked |
 | 100030 | Stay idle past `SESSION_IDLE_TIMEOUT_MINUTES`, then make a request |
 | 100101 / 100102 | `curl -k https://<host>:8443/admin` from an allowed IP (→100101) and from an IP outside the Caddy allowlist (→100102, 403) |
-| 100201 / 100202 | `psql 'host=vw-postgres user=vaultwarden ...'` with a wrong password 1×, then 5× in 2 min (run from a container on the internal net) |
+| 100201 / 100202 | `psql 'host=nextvault-postgres user=vaultwarden ...'` with a wrong password 1×, then 5× in 2 min (run from a container on the internal net) |
 | 100203 | Attempt a non-TLS connection to Postgres (rejected by `pg_hba` `hostssl`) |
 
 Each test event should produce a matching alert id in `alerts.json` (or the
 dashboard) within the agent's `notify_time` (30s). If an audit event does not
 appear, confirm `AUDIT_LOG_ENABLED=true` in `vaultwarden.env`, that the app
 quadlet has `LogDriver=journald`, and that `CONTAINER_NAME` filters in
-`ossec.conf` match the actual container names (`vaultwarden`, `vw-caddy`,
-`vw-postgres`).
+`ossec.conf` match the actual container names (`nextvault`, `nextvault-caddy`,
+`nextvault-postgres`).
 
 ## Notes / gotchas
 

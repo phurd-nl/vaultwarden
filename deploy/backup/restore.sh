@@ -9,7 +9,7 @@
 # *** DESTRUCTIVE ***
 #   --do-db    runs `pg_restore --clean` and OVERWRITES the live "vaultwarden"
 #              database (objects are dropped then recreated).
-#   --do-data  REPLACES the contents of the vw-data volume (attachments, sends,
+#   --do-data  REPLACES the contents of the nextvault-data volume (attachments, sends,
 #              config.json, rsa_key.pem, rsa_key.pub.pem).
 # Neither runs without an explicit flag AND an interactive typed confirmation
 # (override with FORCE=1 only for tested, isolated environments).
@@ -22,10 +22,10 @@ set -euo pipefail
 
 # --- Configuration -----------------------------------------------------------
 BACKUP_DEST="${BACKUP_DEST:-./backups}"
-PG_CONTAINER="${PG_CONTAINER:-vw-postgres}"
+PG_CONTAINER="${PG_CONTAINER:-nextvault-postgres}"
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
 PG_DB="${PG_DB:-vaultwarden}"
-DATA_VOLUME="${DATA_VOLUME:-vw-data}"
+DATA_VOLUME="${DATA_VOLUME:-nextvault-data}"
 BACKUP_KEY_SECRET="${BACKUP_KEY_SECRET:-vw_backup_key}"
 HELPER_IMAGE="${HELPER_IMAGE:-docker.io/library/postgres:17.5}"
 FORCE="${FORCE:-0}"
@@ -179,9 +179,9 @@ if [[ "$DO_DATA" -eq 1 ]]; then
   decrypt "$DATA_ENC" "$DATA_PLAIN"
 
   # Stop the app first if it's running, so we don't restore under a live writer.
-  if systemctl --user is-active --quiet vaultwarden.service 2>/dev/null; then
-    log "stopping vaultwarden.service before data restore ..."
-    systemctl --user stop vaultwarden.service || log "WARNING: could not stop vaultwarden.service"
+  if systemctl --user is-active --quiet nextvault.service 2>/dev/null; then
+    log "stopping nextvault.service before data restore ..."
+    systemctl --user stop nextvault.service || log "WARNING: could not stop nextvault.service"
     RESTART_APP=1
   else
     RESTART_APP=0
@@ -200,8 +200,8 @@ if [[ "$DO_DATA" -eq 1 ]]; then
   log "data restore complete."
 
   if [[ "${RESTART_APP:-0}" -eq 1 ]]; then
-    log "restarting vaultwarden.service ..."
-    systemctl --user start vaultwarden.service || log "WARNING: restart failed — start it manually"
+    log "restarting nextvault.service ..."
+    systemctl --user start nextvault.service || log "WARNING: restart failed — start it manually"
   fi
 fi
 

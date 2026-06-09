@@ -2,7 +2,7 @@
 Description=Caddy data/state (OCSP staples, internal state)
 
 [Volume]
-VolumeName=vw-caddy-data
+VolumeName=nextvault-caddy-data
 
 [Install]
 WantedBy=default.target

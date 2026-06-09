@@ -4,7 +4,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TAG="${1:-localhost/vaultwarden-nist:latest}"
+TAG="${1:-localhost/nextvault:latest}"
 
 cd "$REPO_ROOT"
 echo "Building $TAG from $REPO_ROOT (DB=postgresql) ..."
@@ -20,5 +20,5 @@ podman build \
 
 echo
 echo "Built $TAG"
-echo "Pin this digest in deploy/quadlet/vaultwarden.container (NIST CM-2/SR):"
+echo "Pin this digest in deploy/quadlet/nextvault.container (NIST CM-2/SR):"
 podman image inspect --format '{{.Id}}' "$TAG"

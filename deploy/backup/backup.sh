@@ -9,8 +9,8 @@
 #
 # What it captures, per run, into a timestamped set under $BACKUP_DEST:
 #   1. Logical PostgreSQL dump   — `pg_dump -Fc` (custom format) of DB
-#      "vaultwarden" via the running container vw-postgres (superuser postgres).
-#   2. The vw-data volume        — attachments, sends, config.json,
+#      "vaultwarden" via the running container nextvault-postgres (superuser postgres).
+#   2. The nextvault-data volume        — attachments, sends, config.json,
 #      rsa_key.pem, rsa_key.pub.pem — tarred from a throwaway READ-ONLY mount.
 #   3. A manifest + SHA-256 checksums of every artifact (integrity, SI-7).
 #
@@ -29,10 +29,10 @@ set -euo pipefail
 
 # --- Configuration (override via environment / EnvironmentFile) --------------
 BACKUP_DEST="${BACKUP_DEST:-./backups}"          # where backup sets are written
-PG_CONTAINER="${PG_CONTAINER:-vw-postgres}"      # running postgres container
+PG_CONTAINER="${PG_CONTAINER:-nextvault-postgres}"      # running postgres container
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"         # superuser (used for dump only)
 PG_DB="${PG_DB:-vaultwarden}"                    # database to dump
-DATA_VOLUME="${DATA_VOLUME:-vw-data}"            # app /data podman volume
+DATA_VOLUME="${DATA_VOLUME:-nextvault-data}"            # app /data podman volume
 BACKUP_KEY_SECRET="${BACKUP_KEY_SECRET:-vw_backup_key}"  # podman secret w/ key
 # Tiny, pinned helper image for the throwaway volume-tar container. Reuse the
 # postgres image already present on the host to avoid an extra pull; only its
@@ -71,7 +71,7 @@ log "encryption backend: $ENC_BACKEND"
 # unconditionally shredded on exit. For `age` the secret is an age recipient
 # (public) string OR an identity; we treat it as a passphrase-style recipient
 # via `age -p`-compatible symmetric flow using the secret as the passphrase.
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/vw-backup.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/nextvault-backup.XXXXXX")"
 chmod 700 "$WORK"
 cleanup() {
   # Best-effort secure wipe of any key material / staging.
@@ -126,7 +126,7 @@ podman exec "$PG_CONTAINER" pg_dump -U "$PG_SUPERUSER" -Fc "$PG_DB" > "$DB_PLAIN
 [[ -s "$DB_PLAIN" ]] || die "pg_dump produced an empty file"
 log "pg_dump ok ($(wc -c <"$DB_PLAIN") bytes)"
 
-# 2) vw-data volume — throwaway container, READ-ONLY mount, no network, no caps.
+# 2) nextvault-data volume — throwaway container, READ-ONLY mount, no network, no caps.
 #    We tar to stdout so nothing is written into the volume.
 log "archiving volume ${DATA_VOLUME} (read-only mount) ..."
 podman run --rm --network=none --read-only \

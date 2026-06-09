@@ -4,20 +4,20 @@ Backup / recovery slice for the hardened podman deployment. Implements the
 "Not yet built → Backups/PITR (CP-9/CP-10)" item from `deploy/README.md`.
 
 Everything new lives in **`deploy/backup/`**. Nothing outside this directory is
-edited; the one change needed to an existing file (the `vw-postgres` quadlet, to
+edited; the one change needed to an existing file (the `nextvault-postgres` quadlet, to
 turn on WAL archiving) is **documented, not applied** — see *Enabling PITR*.
 
 ## Files in this directory
 
 | File | Purpose | NIST control |
 |---|---|---|
-| `backup.sh` | Daily encrypted backup: `pg_dump -Fc` of DB `vaultwarden` + tar of the `vw-data` volume (read-only mount), SHA-256 checksums, timestamped manifest. | CP-9, SC-28, SI-7, MP-5 |
-| `restore.sh` | Restore a chosen set: integrity-check → decrypt → `pg_restore --clean` and/or replace `vw-data`. DESTRUCTIVE guards. | CP-10, SC-28, SI-7 |
+| `backup.sh` | Daily encrypted backup: `pg_dump -Fc` of DB `vaultwarden` + tar of the `nextvault-data` volume (read-only mount), SHA-256 checksums, timestamped manifest. | CP-9, SC-28, SI-7, MP-5 |
+| `restore.sh` | Restore a chosen set: integrity-check → decrypt → `pg_restore --clean` and/or replace `nextvault-data`. DESTRUCTIVE guards. | CP-10, SC-28, SI-7 |
 | `basebackup.sh` | Physical `pg_basebackup` baseline for PITR (pairs with WAL archive). | CP-9, CP-10, SC-28 |
 | `postgres-archive.conf` | WAL-archiving settings (documents the `-c` flags + WAL volume to add to the quadlet). | CP-9, CP-10, SC-28 |
 | `create-backup-key.sh` | Creates the `vw_backup_key` podman secret; prints the key to escrow separately. | SC-12, SC-28, IA-5 |
-| `vw-backup.service` | systemd **user** oneshot that runs `backup.sh`. | CP-9 |
-| `vw-backup.timer` | systemd **user** timer — daily at **03:17** (off-peak, non-`:00`). | CP-9 |
+| `nextvault-backup.service` | systemd **user** oneshot that runs `backup.sh`. | CP-9 |
+| `nextvault-backup.timer` | systemd **user** timer — daily at **03:17** (off-peak, non-`:00`). | CP-9 |
 | `README.md` | This file: operating procedure, RTO/RPO, offsite/immutable, separate-key, test-restore. | CP-9/CP-10/MP |
 
 ## Threat / design summary
@@ -34,7 +34,7 @@ turn on WAL archiving) is **documented, not applied** — see *Enabling PITR*.
 - **Least-privilege backup access:** scripts run **rootless** as the deploy user.
   The DB dump uses the existing superuser secret only via `podman exec` into the
   already-running container (no new published port, no new network role). The
-  `vw-data` volume is mounted **read-only** (`:ro`) into a throwaway container
+  `nextvault-data` volume is mounted **read-only** (`:ro`) into a throwaway container
   with `--network=none --cap-drop=ALL --security-opt no-new-privileges`. Restore
   is the only path that mounts read-write, and only behind a typed confirmation.
 - **Integrity (SI-7):** `SHA256SUMS` over the *ciphertext*; `restore.sh` verifies
@@ -66,7 +66,7 @@ durable backup. You **must**:
 3. **Ship the WAL archive too** (for PITR) alongside the base backups.
 
 Suggested offsite step (run after the timer, or as a second timer):
-`rclone copy ~/vaultwarden/backups <remote>:vw-backups --immutable` (or
+`rclone copy ~/vaultwarden/backups <remote>:nextvault-backups --immutable` (or
 `aws s3 sync ... --no-overwrite` against an Object-Lock bucket).
 
 ## RTO / RPO (operator to fill in)
@@ -99,7 +99,7 @@ deploy/backup/create-backup-key.sh
 BACKUP_DEST=~/vaultwarden/backups deploy/backup/backup.sh
 ```
 Produces `~/vaultwarden/backups/<UTC-timestamp>/` with `db-vaultwarden.dump.enc`,
-`data-vw-data.tar.gz.enc`, `SHA256SUMS`, `manifest.txt`, and a `latest` symlink.
+`data-nextvault-data.tar.gz.enc`, `SHA256SUMS`, `manifest.txt`, and a `latest` symlink.
 
 ### Manual base backup (PITR baseline)
 ```bash
@@ -112,8 +112,8 @@ Quadlets can't express timers, so these are plain user units. Install to
 `~/.config/systemd/user/`:
 
 ```bash
-install -Dm644 deploy/backup/vw-backup.service ~/.config/systemd/user/vw-backup.service
-install -Dm644 deploy/backup/vw-backup.timer   ~/.config/systemd/user/vw-backup.timer
+install -Dm644 deploy/backup/nextvault-backup.service ~/.config/systemd/user/nextvault-backup.service
+install -Dm644 deploy/backup/nextvault-backup.timer   ~/.config/systemd/user/nextvault-backup.timer
 
 # Make the scripts executable (repo ships them with shebangs; chmod here):
 chmod +x deploy/backup/*.sh
@@ -122,44 +122,44 @@ chmod +x deploy/backup/*.sh
 loginctl enable-linger "$USER"
 
 systemctl --user daemon-reload
-systemctl --user enable --now vw-backup.timer
-systemctl --user list-timers vw-backup.timer      # confirm next run ~03:17
-journalctl --user -u vw-backup.service            # last run's log
+systemctl --user enable --now nextvault-backup.timer
+systemctl --user list-timers nextvault-backup.timer      # confirm next run ~03:17
+journalctl --user -u nextvault-backup.service            # last run's log
 ```
 The service runs `%h/vaultwarden/deploy/backup/backup.sh`. If you keep the repo
-elsewhere, edit `ExecStart=`/`Documentation=` in `vw-backup.service` accordingly,
+elsewhere, edit `ExecStart=`/`Documentation=` in `nextvault-backup.service` accordingly,
 or symlink `~/vaultwarden/deploy` to your checkout.
 
-## Enabling PITR — DOCUMENTED edit to `vw-postgres.container` (not applied)
+## Enabling PITR — DOCUMENTED edit to `nextvault-postgres.container` (not applied)
 
 PITR needs (a) WAL archiving turned on and (b) a writable WAL-archive volume
 (the postgres rootfs is `ReadOnly=true`). **These are documented here; do not
 expect this slice to have edited the quadlet.** Apply them yourself in
 `deploy/quadlet/`:
 
-**1. New WAL-archive volume** — create `deploy/quadlet/vw-pgwal.volume`:
+**1. New WAL-archive volume** — create `deploy/quadlet/nextvault-pgwal.volume`:
 ```ini
 [Unit]
 Description=PostgreSQL WAL archive for Vaultwarden PITR (NIST CP-9/CP-10)
 
 [Volume]
-VolumeName=vw-pgwal
-# NIST MP/SC-28: must reside on encrypted-at-rest storage (same as vw-pgdata).
+VolumeName=nextvault-pgwal
+# NIST MP/SC-28: must reside on encrypted-at-rest storage (same as nextvault-pgdata).
 
 [Install]
 WantedBy=default.target
 ```
 
-**2. In `deploy/quadlet/vw-postgres.container`:**
+**2. In `deploy/quadlet/nextvault-postgres.container`:**
 
 - Add the volume + its ordering. Under `[Unit]` extend the existing lines:
   ```ini
-  Requires=vw-pgdata-volume.service vw-pgwal-volume.service vaultwarden-internal-network.service
-  After=vw-pgdata-volume.service vw-pgwal-volume.service vaultwarden-internal-network.service
+  Requires=nextvault-pgdata-volume.service nextvault-pgwal-volume.service nextvault-internal-network.service
+  After=nextvault-pgdata-volume.service nextvault-pgwal-volume.service nextvault-internal-network.service
   ```
 - Under `[Container]`, mount the WAL volume:
   ```ini
-  Volume=vw-pgwal.volume:/var/lib/postgresql/wal-archive:Z
+  Volume=nextvault-pgwal.volume:/var/lib/postgresql/wal-archive:Z
   ```
 - Append these flags to the existing `Exec=postgres \` line (mirrors
   `postgres-archive.conf`):
@@ -172,10 +172,10 @@ WantedBy=default.target
     -c log_checkpoints=on
   ```
   > `archive_mode` is **not** reloadable — this requires a container restart:
-  > `systemctl --user daemon-reload && systemctl --user restart vw-postgres`.
+  > `systemctl --user daemon-reload && systemctl --user restart nextvault-postgres`.
 
 Then run `basebackup.sh` to establish a baseline and ship both the base backup
-and the `vw-pgwal` archive offsite. To recover to a point in time, restore a base
+and the `nextvault-pgwal` archive offsite. To recover to a point in time, restore a base
 backup into a fresh data dir and set `recovery_target_time` with
 `restore_command` pointing at the archived WAL (standard PostgreSQL PITR — out of
 scope to script here, but the artifacts this slice produces are exactly what it
@@ -194,35 +194,35 @@ restoring over production.**
 deploy/backup/restore.sh --list
 
 # 1. Stand up an ISOLATED target: a scratch postgres container + scratch volume,
-#    NOT the production vw-postgres / vw-data. Example (rootless, throwaway):
-podman volume create vw-data-test
-podman run -d --name vw-postgres-test \
+#    NOT the production nextvault-postgres / nextvault-data. Example (rootless, throwaway):
+podman volume create nextvault-data-test
+podman run -d --name nextvault-postgres-test \
   --network=none -e POSTGRES_PASSWORD=test -e POSTGRES_DB=vaultwarden \
-  -v vw-pgdata-test:/var/lib/postgresql/data docker.io/library/postgres:17.5
+  -v nextvault-pgdata-test:/var/lib/postgresql/data docker.io/library/postgres:17.5
 
 # 2. Restore the SET into the isolated targets (point the script at them):
-PG_CONTAINER=vw-postgres-test PG_SUPERUSER=postgres PG_DB=vaultwarden \
-DATA_VOLUME=vw-data-test \
+PG_CONTAINER=nextvault-postgres-test PG_SUPERUSER=postgres PG_DB=vaultwarden \
+DATA_VOLUME=nextvault-data-test \
   deploy/backup/restore.sh --set latest --do-db --do-data
 #   (Use FORCE=1 here since it's a disposable test env.)
 
 # 3. VALIDATE:
 #    - DB: row counts on key tables are sane, no pg_restore errors.
-podman exec vw-postgres-test psql -U postgres -d vaultwarden \
+podman exec nextvault-postgres-test psql -U postgres -d vaultwarden \
   -c "select count(*) from users;" -c "select count(*) from ciphers;"
 #    - Data: rsa_key.pem / config.json present, attachments/ and sends/ restored.
-podman run --rm --network=none -v vw-data-test:/d:ro docker.io/library/postgres:17.5 \
+podman run --rm --network=none -v nextvault-data-test:/d:ro docker.io/library/postgres:17.5 \
   sh -c 'ls -la /d && test -f /d/rsa_key.pem && echo "rsa key present"'
 
 # 4. KEEP ROLLBACK: only after validation, restore production — and FIRST take a
 #    rollback snapshot so a bad restore is reversible:
 deploy/backup/backup.sh                       # fresh pre-restore safety set
-#    then run restore.sh against the REAL vw-postgres / vw-data (no FORCE — type
-#    RESTORE at the prompt). restore.sh stops vaultwarden.service during the data
+#    then run restore.sh against the REAL nextvault-postgres / nextvault-data (no FORCE — type
+#    RESTORE at the prompt). restore.sh stops nextvault.service during the data
 #    restore and restarts it after.
 
 # 5. TEAR DOWN the isolated env.
-podman rm -f vw-postgres-test; podman volume rm vw-data-test vw-pgdata-test
+podman rm -f nextvault-postgres-test; podman volume rm nextvault-data-test nextvault-pgdata-test
 ```
 
 Record each test (date, set restored, RTO observed, pass/fail) as evidence for
@@ -233,8 +233,8 @@ CP-9/CP-10.
 This slice did **not** modify anything outside `deploy/backup/`. To go live you
 must apply, in `deploy/quadlet/`:
 
-1. **New `vw-pgwal.volume`** unit (full content above) — the WAL-archive volume.
-2. **`vw-postgres.container`** — add the `vw-pgwal` volume + ordering and the
+1. **New `nextvault-pgwal.volume`** unit (full content above) — the WAL-archive volume.
+2. **`nextvault-postgres.container`** — add the `nextvault-pgwal` volume + ordering and the
    `archive_*` / `wal_level` / `max_wal_size` / `log_checkpoints` `-c` flags to
    the `Exec=` line (exact lines above), then restart the container.
 

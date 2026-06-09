@@ -5,18 +5,18 @@ NIST-hardened Vaultwarden fork: Caddy (TLS) → Vaultwarden → PostgreSQL (TLS)
 managed as **systemd quadlets** (config-as-code, NIST CM).
 
 ```
-                        host:8443 (TLS)
+                        host:443 (TLS)
                               │
-                    ┌─────────▼─────────┐   vaultwarden-edge (egress + publish)
-                    │      vw-caddy     │
+                    ┌─────────▼─────────┐   nextvault-edge (egress + publish)
+                    │      nextvault-caddy     │
                     └─────────┬─────────┘
-   vaultwarden-internal (Internal=true, NO egress, NOT published)
+   nextvault-internal (Internal=true, NO egress, NOT published)
               ┌───────────────┼────────────────┐
       ┌───────▼───────┐               ┌─────────▼─────────┐
-      │  vaultwarden  │──TLS verify──▶│    vw-postgres    │
+      │   nextvault   │──TLS verify──▶│    nextvault-postgres    │
       │  :8080        │  -full        │  TLS + SCRAM      │
       └───────┬───────┘               └─────────┬─────────┘
-         vw-data volume                    vw-pgdata volume
+         nextvault-data volume                    nextvault-pgdata volume
 ```
 
 ## What's implemented here
@@ -26,14 +26,14 @@ managed as **systemd quadlets** (config-as-code, NIST CM).
 | Reverse proxy + TLS + HSTS | SC-8/SC-13 | `caddy/Caddyfile`, internal-CA cert |
 | `/admin` network restriction | AC-3/AC-6 | Caddy `remote_ip` allowlist (EDIT CIDRs) |
 | WebSocket upgrade (101) | functional | Caddy transparent upgrade |
-| DB TLS `verify-full` + SCRAM | SC-8/IA-5 | `postgres/pg_hba.conf`, server SAN=`vw-postgres` |
+| DB TLS `verify-full` + SCRAM | SC-8/IA-5 | `postgres/pg_hba.conf`, server SAN=`nextvault-postgres` |
 | Least-privilege DB role | AC-6 | `postgres/init/01-app-role.sh` (non-superuser, owns only its DB) |
 | Secrets out of config/git | IA-5/SC-28 | `podman secret` mounted as files + native `<KEY>_FILE` (`ADMIN_TOKEN_FILE`, `DATABASE_URL_FILE`) |
 | No public DB; egress restricted | SC-7 | `Internal=true` network; DB never published |
 | Non-root, cap-drop, read-only FS, limits | AC-6/SC | quadlet hardening keys |
 | Audit + lockout + banner + session | AU/AC | fork features, on in `config/vaultwarden.env` |
 | SSO (Entra OIDC), SSO-only | IA-2/IA-8 | `SSO_*` in `config/vaultwarden.env`; client secret as a podman secret (see ADR-0005) |
-| Egress allowlist to Entra only | SC-7 | `vw-egress-proxy` (tinyproxy, default-deny) on `vaultwarden-egress`; app routes OIDC via `HTTPS_PROXY` |
+| Egress allowlist to Entra only | SC-7 | `nextvault-egress-proxy` (tinyproxy, default-deny) on `nextvault-egress`; app routes OIDC via `HTTPS_PROXY` |
 | Image from controlled source | SR-3/CM-2 | `scripts/build-image.sh` + `scripts/build-egress-proxy.sh`, pin digests |
 
 ## Deploy (first time)
@@ -63,8 +63,8 @@ deploy/scripts/build-egress-proxy.sh
 #    then pin the printed digests in the matching .container units
 
 # 6. Start (Caddy pulls up the whole dependency chain)
-systemctl --user start vw-caddy.service
-systemctl --user status vaultwarden vw-postgres vw-caddy
+systemctl --user start nextvault-caddy.service
+systemctl --user status nextvault nextvault-postgres nextvault-caddy
 
 # 7. Acceptance checks
 BASE=https://vaultwarden.example.com:8443 deploy/scripts/verify.sh
@@ -98,7 +98,7 @@ real image digests) that belong to deploy time.
 | Subdir | Control | What it adds | Enable |
 |---|---|---|---|
 | `backup/` | CP-9/CP-10/MP | Encrypted `pg_dump` + `/data` archive, WAL archiving + `pg_basebackup` for PITR, daily user timer, restore + test-restore runbook | `backup/README.md` |
-| `wazuh/` | AU-6/SI/IR | Wazuh agent sidecar + decoders/rules for the `vaultwarden::audit` JSON, Caddy, and Postgres logs; alerts mapped to the handoff alert list | `wazuh/README.md` |
+| `wazuh/` | AU-6/SI/IR | Wazuh agent sidecar + decoders/rules for the `nextvault::audit` JSON, Caddy, and Postgres logs; alerts mapped to the handoff alert list | `wazuh/README.md` |
 | `standby/` | CP-10 | Warm standby app + streaming-replica Postgres, `/data` rsync, manual failover/failback runbooks | `standby/README.md` |
 | `supplychain/` | SR-3/SR-4/RA-5/CM-2 | SBOM (CycloneDX+SPDX), Trivy/Grype scan with severity gate + exceptions, digest-pinning helper, provenance/EOL policy | `supplychain/README.md` |
 

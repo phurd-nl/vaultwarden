@@ -16,7 +16,7 @@ Three images make up the running stack (`deploy/quadlet/*.container`):
 
 | Image | Origin | Trust basis |
 |---|---|---|
-| `localhost/vaultwarden-nist:latest` | **Built from this fork** (`deploy/scripts/build-image.sh`) | Source you control; provenance by build, then digest-pin |
+| `localhost/nextvault:latest` | **Built from this fork** (`deploy/scripts/build-image.sh`) | Source you control; provenance by build, then digest-pin |
 | `docker.io/library/postgres:17.5` | Pulled (Docker Official Image) | Registry content digest; allowlisted registry |
 | `docker.io/library/caddy:2.8` | Pulled (Docker Official Image) | Registry content digest; allowlisted registry |
 
@@ -36,7 +36,7 @@ Three images make up the running stack (`deploy/quadlet/*.container`):
 
 ```bash
 # 0. Prereqs: build/pull the images first.
-deploy/scripts/build-image.sh                 # localhost/vaultwarden-nist:latest
+deploy/scripts/build-image.sh                 # localhost/nextvault:latest
 podman pull docker.io/library/postgres:17.5
 podman pull docker.io/library/caddy:2.8
 
@@ -120,7 +120,7 @@ approval: it enumerates every transitive package an assessor would ask about.
 
 ### 3. Image provenance + private / allowlisted registry (SR-3 / SR-4 / CM-2)
 
-**Provenance by construction (the fork image).** `localhost/vaultwarden-nist` is
+**Provenance by construction (the fork image).** `localhost/nextvault` is
 built from this repository via `build-image.sh`. Provenance is the build itself,
 fixed by pinning the resulting digest.
 
@@ -136,13 +136,13 @@ not exist on other hosts. For a multi-host or assessable deployment:
 ```bash
 # Build, then push the fork image to your private/allowlisted registry:
 deploy/scripts/build-image.sh
-podman tag localhost/vaultwarden-nist:latest \
-  registry.internal.example.com/vaultwarden-nist:2026.06.09
-podman push registry.internal.example.com/vaultwarden-nist:2026.06.09
+podman tag localhost/nextvault:latest \
+  registry.internal.example.com/nextvault:2026.06.09
+podman push registry.internal.example.com/nextvault:2026.06.09
 # Obtain the verifiable registry digest to pin:
 podman image inspect --format '{{index .RepoDigests 0}}' \
-  registry.internal.example.com/vaultwarden-nist:2026.06.09
-# -> Image=registry.internal.example.com/vaultwarden-nist@sha256:...
+  registry.internal.example.com/nextvault:2026.06.09
+# -> Image=registry.internal.example.com/nextvault@sha256:...
 ```
 
 Mirror `postgres` and `caddy` into the same registry and configure podman's
@@ -180,7 +180,7 @@ re-pin its digest; if no fix exists, file an exception (§7).
 
 Scan cadence (RA-5): on every image build/change **and** on a recurring schedule
 (weekly) so newly-disclosed CVEs against an unchanged image are caught. Wire
-`scan.sh` into CI and/or a systemd timer alongside `deploy/backup/vw-backup.timer`.
+`scan.sh` into CI and/or a systemd timer alongside `deploy/backup/nextvault-backup.timer`.
 
 ### 6. SBOM + scan as assessment evidence (RA-5 / SR-3 / CA-7)
 
@@ -233,9 +233,9 @@ the exact replacement lines; a human edits and commits them (CM-3 change control
 
 | File | From | To (example shape) |
 |---|---|---|
-| `deploy/quadlet/vaultwarden.container` | `Image=localhost/vaultwarden-nist:latest` | `Image=registry.internal.example.com/vaultwarden-nist@sha256:...` (after push) |
-| `deploy/quadlet/vw-postgres.container` | `Image=docker.io/library/postgres:17.5` | `Image=docker.io/library/postgres@sha256:...` |
-| `deploy/quadlet/vw-caddy.container` | `Image=docker.io/library/caddy:2.8` | `Image=docker.io/library/caddy@sha256:...` |
+| `deploy/quadlet/nextvault.container` | `Image=localhost/nextvault:latest` | `Image=registry.internal.example.com/nextvault@sha256:...` (after push) |
+| `deploy/quadlet/nextvault-postgres.container` | `Image=docker.io/library/postgres:17.5` | `Image=docker.io/library/postgres@sha256:...` |
+| `deploy/quadlet/nextvault-caddy.container` | `Image=docker.io/library/caddy:2.8` | `Image=docker.io/library/caddy@sha256:...` |
 
 After editing: `systemctl --user daemon-reload` and restart the units. Re-run
 `sbom.sh` + `scan.sh` whenever a digest changes — the new artifact must be

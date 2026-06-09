@@ -35,7 +35,7 @@ TRIVYIGNORE="${TRIVYIGNORE:-$HERE/.trivyignore}"
 GRYPE_CONFIG="${GRYPE_CONFIG:-$HERE/.grype.yaml}"
 
 IMAGES=(
-	"localhost/vaultwarden-nist:latest"
+	"localhost/nextvault:latest"
 	"docker.io/library/postgres:17.5"
 	"docker.io/library/caddy:2.8"
 )

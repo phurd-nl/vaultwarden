@@ -46,7 +46,7 @@ Options:
   -h, --help        This help
 
 Example:
-  sudo $0 --device /dev/vdb --user vaultwarden
+  sudo $0 --device /dev/vdb --user nextvault
 EOF
 }
 

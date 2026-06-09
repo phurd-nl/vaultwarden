@@ -18,14 +18,14 @@
 # Requirements:
 #   * archive_mode=on already active (see postgres-archive.conf + README).
 #   * A replication-capable connection. We exec pg_basebackup INSIDE the
-#     vw-postgres container as the superuser over the local socket, so no
+#     nextvault-postgres container as the superuser over the local socket, so no
 #     network replication slot/role is needed and nothing is published.
 # =============================================================================
 set -euo pipefail
 
 BACKUP_DEST="${BACKUP_DEST:-./backups}"
 BASEBACKUP_SUBDIR="${BASEBACKUP_SUBDIR:-basebackups}"
-PG_CONTAINER="${PG_CONTAINER:-vw-postgres}"
+PG_CONTAINER="${PG_CONTAINER:-nextvault-postgres}"
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
 BACKUP_KEY_SECRET="${BACKUP_KEY_SECRET:-vw_backup_key}"
 

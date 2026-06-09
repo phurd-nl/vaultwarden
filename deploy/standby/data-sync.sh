@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# data-sync.sh — replicate the Vaultwarden /data volume (vw-data) to the warm
-# standby's /data (standby-data) on a schedule (NIST 800-53B Moderate: CP-10).
+# data-sync.sh — replicate the Vaultwarden /data volume (nextvault-data) to the warm
+# standby's /data (nextvault-standby-data) on a schedule (NIST 800-53B Moderate: CP-10).
 #
 # WHY THIS EXISTS
 #   PostgreSQL streaming replication (setup-replication.sh) keeps the DATABASE
@@ -14,7 +14,7 @@
 #                            forced to re-auth. Syncing /data carries the SAME
 #                            key over, so sessions survive failover.)
 #     * config.json         (only if drift exists; treat as drift — see README)
-#   This script rsyncs vw-data -> standby-data so the failed-over app serves the
+#   This script rsyncs nextvault-data -> nextvault-standby-data so the failed-over app serves the
 #   same attachments/sends and the same JWT signing key.
 #
 # TWO TOPOLOGIES (pick one; both supported):
@@ -23,7 +23,7 @@
 #     this script at all; set MODE=shared to make it a no-op that just records
 #     that /data is shared. RPO for /data = 0.
 #   * TWO HOSTS       — primary and standby on different hosts. This script
-#     rsyncs over SSH from the primary host into the standby host's standby-data
+#     rsyncs over SSH from the primary host into the standby host's nextvault-standby-data
 #     volume backing path. RPO for /data = up to one sync interval.
 #
 # CONSISTENCY CAVEAT (called out in README "Consistency caveat"):
@@ -35,23 +35,23 @@
 #   reachable to shrink this window to ~0; if the primary is GONE, the gap = the
 #   data written since the last scheduled sync. This is the /data RPO.
 #
-# This runs READ-ONLY against the source: the vw-data volume is mounted :ro into
+# This runs READ-ONLY against the source: the nextvault-data volume is mounted :ro into
 # a throwaway, network-isolated, cap-dropped container that tars it to stdout, or
-# rsync reads it directly. Nothing writes to vw-data.
+# rsync reads it directly. Nothing writes to nextvault-data.
 # =============================================================================
 set -euo pipefail
 
 MODE="${MODE:-twohost}"                       # twohost | shared | local
-SRC_VOLUME="${SRC_VOLUME:-vw-data}"
-DST_VOLUME="${DST_VOLUME:-standby-data}"       # used in MODE=local (single host)
+SRC_VOLUME="${SRC_VOLUME:-nextvault-data}"
+DST_VOLUME="${DST_VOLUME:-nextvault-standby-data}"       # used in MODE=local (single host)
 PG_IMAGE="${PG_IMAGE:-docker.io/library/postgres:17.5}"  # any image with rsync; reuse a present one
 
 # MODE=twohost settings — EDIT for your standby host.
 STANDBY_SSH="${STANDBY_SSH:-deploy@standby-host}"     # ssh user@host of the standby
-# Path on the STANDBY host where the standby-data volume backing store lives.
+# Path on the STANDBY host where the nextvault-standby-data volume backing store lives.
 # For rootless podman that is typically:
-#   ~/.local/share/containers/storage/volumes/standby-data/_data
-STANDBY_DATA_PATH="${STANDBY_DATA_PATH:-/home/deploy/.local/share/containers/storage/volumes/standby-data/_data}"
+#   ~/.local/share/containers/storage/volumes/nextvault-standby-data/_data
+STANDBY_DATA_PATH="${STANDBY_DATA_PATH:-/home/deploy/.local/share/containers/storage/volumes/nextvault-standby-data/_data}"
 SSH_OPTS="${SSH_OPTS:--o StrictHostKeyChecking=accept-new -o BatchMode=yes}"
 
 log() { printf '%s [data-sync] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -62,7 +62,7 @@ command -v podman >/dev/null 2>&1 || die "podman not found"
 case "$MODE" in
   shared)
     log "MODE=shared: /data is on shared/replicated storage; no rsync needed (RPO=0)."
-    log "Ensure both vaultwarden.container and vaultwarden-standby.container mount the SAME backing path."
+    log "Ensure both nextvault.container and nextvault-standby.container mount the SAME backing path."
     exit 0
     ;;
 

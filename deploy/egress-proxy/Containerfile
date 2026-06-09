@@ -1,6 +1,6 @@
 # Minimal forward proxy for the Vaultwarden -> Entra OIDC egress allowlist.
 # Controlled-source build (NIST SR-3/CM-2). Config is mounted at runtime, not
-# baked, so the allowlist stays config-as-code (see ../quadlet/vw-egress-proxy.container).
+# baked, so the allowlist stays config-as-code (see ../quadlet/nextvault-egress-proxy.container).
 FROM docker.io/library/alpine:3.20
 
 RUN apk add --no-cache tinyproxy

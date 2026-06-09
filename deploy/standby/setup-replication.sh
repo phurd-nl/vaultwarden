@@ -8,36 +8,36 @@
 #      (`vw_replicator`, NOT a superuser — REPLICATION + LOGIN only, AC-6).
 #   2. Creates a physical replication SLOT on the primary so the primary retains
 #      WAL the replica still needs even if the replica is briefly offline.
-#   3. Runs pg_basebackup from the primary into the standby-pgdata volume with
+#   3. Runs pg_basebackup from the primary into the nextvault-standby-pgdata volume with
 #      -R, which writes standby.signal + primary_conninfo (over TLS, verify-full)
-#      so the replica streams as soon as vw-postgres-standby starts.
+#      so the replica streams as soon as nextvault-postgres-standby starts.
 #
 # It exec's into the ALREADY-RUNNING primary container for the role/slot SQL and
 # runs pg_basebackup in a THROWAWAY postgres container that mounts only the
-# standby-pgdata volume — no new published port, rootless, cap-dropped.
+# nextvault-standby-pgdata volume — no new published port, rootless, cap-dropped.
 #
 # PREREQUISITES (documented, applied by you — see README "Primary-side config"):
 #   * Primary started with: wal_level=replica, max_wal_senders>=10,
-#     max_replication_slots>=10  (added as -c flags to vw-postgres.container Exec)
+#     max_replication_slots>=10  (added as -c flags to nextvault-postgres.container Exec)
 #   * pg_hba.conf has a hostssl replication line for vw_replicator from the
 #     internal subnet (see README "Primary-side pg_hba").
 #   * Secret vw_replication_password exists (this script creates it if missing).
 #   * The replica server cert/key + CA are in place (deploy/tls).
 #
-# Re-running is guarded: it refuses to clobber a non-empty standby-pgdata volume
+# Re-running is guarded: it refuses to clobber a non-empty nextvault-standby-pgdata volume
 # unless you pass --reseed.
 # =============================================================================
 set -euo pipefail
 
-PRIMARY_CONTAINER="${PRIMARY_CONTAINER:-vw-postgres}"
+PRIMARY_CONTAINER="${PRIMARY_CONTAINER:-nextvault-postgres}"
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
 PG_IMAGE="${PG_IMAGE:-docker.io/library/postgres:17.5}"
-PG_NETWORK="${PG_NETWORK:-vaultwarden-internal.network}"
-PRIMARY_HOST="${PRIMARY_HOST:-vw-postgres}"          # must match server cert SAN
+PG_NETWORK="${PG_NETWORK:-nextvault-internal.network}"
+PRIMARY_HOST="${PRIMARY_HOST:-nextvault-postgres}"          # must match server cert SAN
 PRIMARY_PORT="${PRIMARY_PORT:-5432}"
 REPL_ROLE="${REPL_ROLE:-vw_replicator}"
 REPL_SLOT="${REPL_SLOT:-vw_standby_slot}"
-STANDBY_PGDATA_VOL="${STANDBY_PGDATA_VOL:-standby-pgdata}"
+STANDBY_PGDATA_VOL="${STANDBY_PGDATA_VOL:-nextvault-standby-pgdata}"
 REPL_PW_SECRET="${REPL_PW_SECRET:-vw_replication_password}"
 CA_IN_CONTAINER="/etc/ssl/certs/internal-ca.crt"
 RESEED=0
@@ -123,10 +123,10 @@ podman run --rm \
 
 log "pg_basebackup complete; standby.signal + primary_conninfo written into the data dir"
 log "NEXT:"
-log "  1) confirm secret '$REPL_PW_SECRET' is mounted by vw-postgres-standby.container"
-log "  2) systemctl --user start vw-postgres-standby.service"
+log "  1) confirm secret '$REPL_PW_SECRET' is mounted by nextvault-postgres-standby.container"
+log "  2) systemctl --user start nextvault-postgres-standby.service"
 log "  3) verify streaming on the PRIMARY:"
 log "       podman exec $PRIMARY_CONTAINER psql -U $PG_SUPERUSER -xc \\"
 log "         \"SELECT client_addr, state, sync_state, replay_lag FROM pg_stat_replication;\""
 log "     and on the REPLICA (should report 't'):"
-log "       podman exec vw-postgres-standby psql -U $PG_SUPERUSER -tAc 'SELECT pg_is_in_recovery();'"
+log "       podman exec nextvault-postgres-standby psql -U $PG_SUPERUSER -tAc 'SELECT pg_is_in_recovery();'"

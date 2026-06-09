@@ -1,5 +1,5 @@
 # =============================================================================
-# vw-backup.service — runs the encrypted backup once (driven by vw-backup.timer).
+# nextvault-backup.service — runs the encrypted backup once (driven by nextvault-backup.timer).
 #
 # NIST 800-53B Moderate: CP-9 (scheduled, automated backups).
 #
@@ -14,8 +14,8 @@
 Description=Vaultwarden encrypted backup (pg_dump + /data, NIST CP-9)
 Documentation=file:%h/vaultwarden/deploy/backup/README.md
 # Only meaningful if the DB container is up; don't fail the boot if it isn't.
-Wants=vw-postgres.service
-After=vw-postgres.service
+Wants=nextvault-postgres.service
+After=nextvault-postgres.service
 
 [Service]
 Type=oneshot

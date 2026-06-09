@@ -2,8 +2,8 @@
 Description=Vaultwarden egress network (allowlist proxy -> Entra only)
 
 [Network]
-NetworkName=vaultwarden-egress
-# Egress-capable bridge used ONLY by the vw-egress-proxy for outbound OIDC calls
+NetworkName=nextvault-egress
+# Egress-capable bridge used ONLY by the nextvault-egress-proxy for outbound OIDC calls
 # to Microsoft Entra. It is deliberately separate from the edge (ingress) network
 # so each direction has a single, named path: edge = Caddy ingress only,
 # egress = proxy outbound only. No container publishes ports on this network.

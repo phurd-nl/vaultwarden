@@ -9,7 +9,7 @@ should exclude `*.key`/`*.pem`).
 | Path | Purpose | SAN requirement |
 |---|---|---|
 | `ca/internal-ca.crt` | CA root/chain the **app** trusts to validate Postgres (`sslmode=verify-full`) and that **clients** trust for Caddy. | n/a |
-| `postgres/server.crt` + `postgres/server.key` + `postgres/ca.crt` | PostgreSQL server cert/key + issuing CA. | server cert SAN **must** include `vw-postgres` (the in-network hostname the app connects to). |
+| `postgres/server.crt` + `postgres/server.key` + `postgres/ca.crt` | PostgreSQL server cert/key + issuing CA. | server cert SAN **must** include `nextvault-postgres` (the in-network hostname the app connects to). |
 | `caddy/server.crt` + `caddy/server.key` | Caddy TLS cert/key for user/admin ingress. | SAN **must** include your `DOMAIN` host (e.g. `vaultwarden.example.com`). |
 
 ## Permissions
@@ -35,13 +35,13 @@ To smoke-test the stack before real certs are issued:
 openssl req -x509 -newkey rsa:4096 -nodes -keyout ca/internal-ca.key \
   -out ca/internal-ca.crt -days 3650 -subj "/CN=Internal Lab CA"
 
-# Postgres server cert (SAN=vw-postgres)
+# Postgres server cert (SAN=nextvault-postgres)
 openssl req -newkey rsa:2048 -nodes -keyout postgres/server.key \
-  -out postgres/server.csr -subj "/CN=vw-postgres" \
-  -addext "subjectAltName=DNS:vw-postgres"
+  -out postgres/server.csr -subj "/CN=nextvault-postgres" \
+  -addext "subjectAltName=DNS:nextvault-postgres"
 openssl x509 -req -in postgres/server.csr -CA ca/internal-ca.crt \
   -CAkey ca/internal-ca.key -CAcreateserial -days 825 \
-  -extfile <(printf "subjectAltName=DNS:vw-postgres") -out postgres/server.crt
+  -extfile <(printf "subjectAltName=DNS:nextvault-postgres") -out postgres/server.crt
 cp ca/internal-ca.crt postgres/ca.crt
 
 # Caddy cert (SAN=your DOMAIN)

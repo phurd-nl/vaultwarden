@@ -1,31 +1,31 @@
 [Unit]
 Description=PostgreSQL streaming REPLICA for Vaultwarden (TLS, hot standby, NIST CP-10)
-# Read-only hot standby of vw-postgres. It connects to the primary over TLS
+# Read-only hot standby of nextvault-postgres. It connects to the primary over TLS
 # using primary_conninfo + a physical replication slot, continuously streaming
 # WAL so its data directory tracks the primary with seconds of lag (warm
 # standby for CP-10). It is seeded once by setup-replication.sh (pg_basebackup),
 # which writes standby.signal + the replication connection info into the replica
 # data dir. On failover, failover.sh runs pg_promote() to make this a primary.
-Requires=standby-pgdata-volume.service vaultwarden-internal-network.service
-After=standby-pgdata-volume.service vaultwarden-internal-network.service vw-postgres.service
+Requires=nextvault-standby-pgdata-volume.service nextvault-internal-network.service
+After=nextvault-standby-pgdata-volume.service nextvault-internal-network.service nextvault-postgres.service
 
 [Container]
-ContainerName=vw-postgres-standby
+ContainerName=nextvault-postgres-standby
 # SAME postgres image (and digest) as the primary — replication requires the
 # major version to match. Pin by digest in production.
 Image=docker.io/library/postgres:17.5
 AutoUpdate=local
-Network=vaultwarden-internal.network
+Network=nextvault-internal.network
 # Replica is reachable ONLY on the internal network — never published.
 
 # NO POSTGRES_* bootstrap env: the data dir is NOT initdb'd here. It is seeded
-# by setup-replication.sh (pg_basebackup from the primary) into standby-pgdata
+# by setup-replication.sh (pg_basebackup from the primary) into nextvault-standby-pgdata
 # BEFORE this unit is first started. The replica role's password reaches
 # postgres via the .pgpass / primary_conninfo written by that script (mounted
 # read-only below), so no cleartext password is in this unit or in env.
 Secret=vw_replication_password,type=mount,mode=0400,target=/run/secrets/vw_replication_password
 
-Volume=standby-pgdata.volume:/var/lib/postgresql/data:Z
+Volume=nextvault-standby-pgdata.volume:/var/lib/postgresql/data:Z
 # Same TLS material as the primary so the app's verify-full keeps working after
 # promotion (SAN must also cover this host; see README "TLS for the replica").
 Volume=%h/vaultwarden/tls/postgres:/etc/postgresql/tls:ro,Z
@@ -68,7 +68,7 @@ TimeoutStartSec=300
 
 # --- NO [Install] SECTION ON PURPOSE ---
 # The replica is started/stopped explicitly:
-#   systemctl --user start vw-postgres-standby.service   # begin streaming
+#   systemctl --user start nextvault-postgres-standby.service   # begin streaming
 # Once seeded it MAY be enabled to start at boot so replication resumes
 # automatically; leave it manual until you have validated replication, then
-# `systemctl --user enable vw-postgres-standby.service` if desired.
+# `systemctl --user enable nextvault-postgres-standby.service` if desired.

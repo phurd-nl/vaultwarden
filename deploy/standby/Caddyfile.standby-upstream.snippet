@@ -7,26 +7,26 @@
 # In deploy/caddy/Caddyfile (installed at ~/vaultwarden/caddy/Caddyfile) the two
 # reverse_proxy lines point at the PRIMARY app:
 #
-#     reverse_proxy vaultwarden:8080
+#     reverse_proxy nextvault:8080
 #
 # On FAILOVER, change BOTH occurrences (the @admin handle and the catch-all
 # handle) to the standby app's container name:
 #
-#     reverse_proxy vaultwarden-standby:8080
+#     reverse_proxy nextvault-standby:8080
 #
 # Then reload Caddy WITHOUT downtime:
 #
-#     podman exec vw-caddy caddy reload --config /etc/caddy/Caddyfile
+#     podman exec nextvault-caddy caddy reload --config /etc/caddy/Caddyfile
 #
-# On FAILBACK, change them back to `vaultwarden:8080` and reload again.
+# On FAILBACK, change them back to `nextvault:8080` and reload again.
 #
 # WHY name-based (not an upstream pool): this is active-PASSIVE. We deliberately
-# do NOT list both backends in one `reverse_proxy vaultwarden:8080 vaultwarden-standby:8080`
+# do NOT list both backends in one `reverse_proxy nextvault:8080 nextvault-standby:8080`
 # pool, because that would load-balance writes across TWO app instances against
 # (until promotion) different DBs — split brain. Exactly one upstream is live at
 # a time; the switch is the failover action. (NIST CP-10.)
 #
-# Both vaultwarden and vaultwarden-standby are on vaultwarden-internal, so Caddy
+# Both nextvault and nextvault-standby are on nextvault-internal, so Caddy
 # resolves either container name with no network change.
 #
 # ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ OUT_DIR="${SBOM_OUT_DIR:-$HERE/sbom}"
 # The three images this deployment runs (must match deploy/quadlet/*.container).
 # The locally-built fork image is FIRST: build-image.sh must have produced it.
 IMAGES=(
-	"localhost/vaultwarden-nist:latest"
+	"localhost/nextvault:latest"
 	"docker.io/library/postgres:17.5"
 	"docker.io/library/caddy:2.8"
 )

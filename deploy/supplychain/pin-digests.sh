@@ -10,16 +10,16 @@
 #   - Pulled images (postgres, caddy): RepoDigests[0] -> name@sha256:...  This is
 #     the REGISTRY content digest: pinning to it makes the tag irrelevant and the
 #     pull reproducible/verifiable.
-#   - Locally-built fork (vaultwarden-nist): has NO registry digest until pushed.
+#   - Locally-built fork (nextvault): has NO registry digest until pushed.
 #     We print its local image .Id and the private-registry workflow to obtain a
 #     real, deployable digest (see README "Image provenance / private registry").
 set -euo pipefail
 
 # ref|quadlet file|kind   (kind: built = local fork, pulled = from a registry)
 SPECS=(
-	"localhost/vaultwarden-nist:latest|vaultwarden.container|built"
-	"docker.io/library/postgres:17.5|vw-postgres.container|pulled"
-	"docker.io/library/caddy:2.8|vw-caddy.container|pulled"
+	"localhost/nextvault:latest|nextvault.container|built"
+	"docker.io/library/postgres:17.5|nextvault-postgres.container|pulled"
+	"docker.io/library/caddy:2.8|nextvault-caddy.container|pulled"
 )
 
 QUADLET_DIR="${QUADLET_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../quadlet" && pwd)}"
@@ -105,11 +105,11 @@ for spec in "${SPECS[@]}"; do
 		echo
 		echo "  RECOMMENDED (SR-3/SR-4) — push to your private/allowlisted registry,"
 		echo "  then pin the returned registry digest. See README 'Private registry'."
-		echo "    podman tag $ref registry.internal.example.com/vaultwarden-nist:<ver>"
-		echo "    podman push registry.internal.example.com/vaultwarden-nist:<ver>"
+		echo "    podman tag $ref registry.internal.example.com/nextvault:<ver>"
+		echo "    podman push registry.internal.example.com/nextvault:<ver>"
 		echo "    podman image inspect --format '{{index .RepoDigests 0}}' \\"
-		echo "      registry.internal.example.com/vaultwarden-nist:<ver>"
-		echo "    # -> Image=registry.internal.example.com/vaultwarden-nist@sha256:..."
+		echo "      registry.internal.example.com/nextvault:<ver>"
+		echo "    # -> Image=registry.internal.example.com/nextvault@sha256:..."
 		echo
 	fi
 done

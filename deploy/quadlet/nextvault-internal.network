@@ -2,7 +2,7 @@
 Description=Vaultwarden internal network (app <-> database <-> proxy backend)
 
 [Network]
-NetworkName=vaultwarden-internal
+NetworkName=nextvault-internal
 # Internal=true => no external egress and no host port mapping on this network.
 # Satisfies NIST SC egress restriction: the app and database cannot reach the
 # internet. External fetches (icons, HIBP) are disabled in vaultwarden.env so

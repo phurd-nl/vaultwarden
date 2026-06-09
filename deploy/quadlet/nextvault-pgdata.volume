@@ -2,7 +2,7 @@
 Description=PostgreSQL data directory for Vaultwarden
 
 [Volume]
-VolumeName=vw-pgdata
+VolumeName=nextvault-pgdata
 # NIST MP/SC: must reside on encrypted-at-rest storage (see deploy/README.md).
 
 [Install]
