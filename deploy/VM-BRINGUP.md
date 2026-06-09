@@ -32,10 +32,18 @@ podman --version                      # need >= 4.4
 sudo loginctl enable-linger "$SVC_USER"
 
 # 0.3 ENCRYPTED STORAGE (NIST MP/SC-28): the container storage backing the
-#     volumes (~/.local/share/containers/storage) MUST sit on an encrypted FS
-#     (LUKS root, or a dedicated encrypted mount). Verify before storing vault data:
-findmnt -no SOURCE,FSTYPE "$HOME/.local/share" || true
-#     If this VM's disk is not encrypted at rest, stop and fix that first.
+#     volumes MUST sit on an encrypted FS. This VM uses two disks: a LUKS OS
+#     disk (encrypt it in the OS installer) and a LUKS data disk that
+#     auto-unlocks when root unlocks. Set the data disk up with:
+#
+#       sudo deploy/scripts/setup-data-disk-luks.sh --device /dev/vdb --user "$SVC_USER"
+#
+#     (DESTRUCTIVE on the target disk; interactive passphrase; wires a keyfile
+#     on encrypted root + /etc/crypttab + /etc/fstab and mounts it at the
+#     service user's container storage dir. See the script's --help.)
+#     Then verify it's on the encrypted mount:
+findmnt -no SOURCE,FSTYPE "$HOME/.local/share/containers" || true
+#     If this VM's disks are not encrypted at rest, stop and fix that first.
 
 # 0.4 Allow rootless bind to :443 and persist it.
 echo 'net.ipv4.ip_unprivileged_port_start=443' | sudo tee /etc/sysctl.d/99-vaultwarden-port443.conf
