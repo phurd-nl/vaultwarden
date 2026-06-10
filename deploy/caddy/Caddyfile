@@ -22,18 +22,21 @@ nextvault.nxlink.com:443 {
 		-Server
 	}
 
-	# NIST AC: restrict /admin to approved networks. EDIT the allowlist CIDRs.
+	# NIST AC: /admin is gated by the ADMIN_TOKEN (Argon2id) plus the host
+	# firewall on :443. A Caddy remote_ip allowlist canNOT work under rootless
+	# podman — rootlessport masquerades the client source IP, so Caddy never sees
+	# the real client (it sees the container-network address). Source-IP
+	# restriction is therefore enforced at the host firewall, which does see the
+	# real source. See docs/adr/0007. /admin proxies like any other path.
 	@admin path /admin /admin/*
 	handle @admin {
-		@admin_denied not remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
-		respond @admin_denied "Forbidden" 403
-		reverse_proxy nextvault:8080
+		reverse_proxy 10.89.10.10:8080
 	}
 
 	# Everything else, including the WebSocket upgrade at /notifications/hub
 	# (Caddy proxies Upgrade/Connection headers transparently → HTTP 101).
 	handle {
-		reverse_proxy nextvault:8080
+		reverse_proxy 10.89.10.10:8080
 	}
 
 	# Access + error logging to stdout for SIEM ingestion (NIST AU).

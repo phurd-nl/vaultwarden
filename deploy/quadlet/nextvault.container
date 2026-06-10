@@ -14,7 +14,11 @@ ContainerName=nextvault
 # NIST CM-2/SR: pin by digest in production (localhost/nextvault@sha256:...).
 Image=localhost/nextvault:latest
 AutoUpdate=local
-Network=nextvault-internal.network
+# Static internal IP. The container name "nextvault" collides with the VM
+# hostname (host /etc/hosts maps 127.0.1.1 nextvault, which podman copies into
+# every container and shadows aardvark-DNS), so Caddy must target the app by IP,
+# not name. Mirrors the egress-proxy's static-IP approach.
+Network=nextvault-internal.network:ip=10.89.10.10
 
 # Non-secret configuration as code (NIST CM).
 EnvironmentFile=%h/vaultwarden/config/vaultwarden.env

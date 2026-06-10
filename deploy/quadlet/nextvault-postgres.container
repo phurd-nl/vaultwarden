@@ -18,6 +18,12 @@ Environment=POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sh
 Secret=vw_pg_superuser_password,type=env,target=POSTGRES_PASSWORD
 # App-role password is exposed to the init script as a mounted file (see init/01-app-role.sh).
 Secret=vw_db_app_password,type=mount,mode=0444
+# Server TLS key as a 0400 secret OWNED BY the container postgres UID (999).
+# Rootless userns maps host vault(1000)->container-root(0), so a host 0600 key
+# is unreadable by postgres(999) and PG refuses a group/world-readable key.
+# A secret mount with uid/gid avoids baking the key into an image.
+# (deploy/README.md "Postgres TLS key permissions")
+Secret=vw_pg_server_key,type=mount,target=/etc/postgresql/server.key,mode=0400,uid=999,gid=999
 
 Volume=nextvault-pgdata.volume:/var/lib/postgresql/data:Z
 Volume=%h/vaultwarden/postgres/init:/docker-entrypoint-initdb.d:ro,Z
@@ -30,7 +36,7 @@ Volume=%h/vaultwarden/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro,Z
 Exec=postgres \
   -c ssl=on \
   -c ssl_cert_file=/etc/postgresql/tls/server.crt \
-  -c ssl_key_file=/etc/postgresql/tls/server.key \
+  -c ssl_key_file=/etc/postgresql/server.key \
   -c ssl_ca_file=/etc/postgresql/tls/ca.crt \
   -c hba_file=/etc/postgresql/pg_hba.conf \
   -c password_encryption=scram-sha-256 \

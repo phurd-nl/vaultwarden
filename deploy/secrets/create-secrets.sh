@@ -20,7 +20,15 @@ DB_NAME="vaultwarden"
 DB_USER="vaultwarden"
 CA_PATH_IN_APP="/etc/ssl/certs/internal-ca.crt"
 
-gen_pw() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40; }
+gen_pw() {
+	# `tr | head` makes head close the pipe early, so tr takes SIGPIPE (141);
+	# under `set -e -o pipefail` that would abort the script. Run the pipeline
+	# in a subshell with pipefail off and assert the length instead.
+	local pw
+	pw="$(set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40)"
+	[[ ${#pw} -eq 40 ]] || { echo "gen_pw: failed to generate password" >&2; return 1; }
+	printf '%s' "$pw"
+}
 
 put_secret() {
 	local name="$1" value="$2"
