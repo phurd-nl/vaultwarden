@@ -1,6 +1,11 @@
 ---
 vault_version: "v2026.4.1"
+# Upstream web-vault this fork was rebranded from (kept for provenance/record only;
+# no longer the FROM target — see vault_local_image and the vault stage comment).
 vault_image_digest: "sha256:ca2a4251c4e63c9ad428262b4dd452789a1b9f6fce71da351e93dceed0d2edbe"
+# NextVault-branded web-vault, built locally from phurd-nl/bw_web_builds
+# (branch nextvault-rebrand) and loaded onto the build host before building the server.
+vault_local_image: "localhost/nextvault-web-vault:{{ vault_version | replace('+', '_') }}"
 # Cross Compile Docker Helper Scripts v1.9.0
 # We use the linux/amd64 platform shell scripts since there is no difference between the different platform scripts
 # https://github.com/tonistiigi/xx | https://hub.docker.com/r/tonistiigi/xx/tags

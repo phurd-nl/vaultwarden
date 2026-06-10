@@ -10,24 +10,21 @@
 # 	https://whitfin.io/speeding-up-rust-docker-builds/
 
 ####################### VAULT BUILD IMAGE #######################
-# The web-vault digest specifies a particular web-vault build on Docker Hub.
-# Using the digest instead of the tag name provides better security,
-# as the digest of an image is immutable, whereas a tag name can later
-# be changed to point to a malicious image.
+# NextVault uses a locally-built, NextVault-branded web-vault instead of the
+# public docker.io/vaultwarden/web-vault image. It is built from our fork
+# phurd-nl/bw_web_builds (branch nextvault-rebrand, web-vault v2026.4.1)
+# via `make podman-extract`, then loaded onto this build host as the image below.
 #
-# To verify the current digest for a given tag name:
-# - From https://hub.docker.com/r/vaultwarden/web-vault/tags,
-#   click the tag name to view the digest of the image it currently points to.
-# - From the command line:
-#     $ docker pull docker.io/vaultwarden/web-vault:v2026.4.1
-#     $ docker image inspect --format "{{.RepoDigests}}" docker.io/vaultwarden/web-vault:v2026.4.1
-#     [docker.io/vaultwarden/web-vault@sha256:ca2a4251c4e63c9ad428262b4dd452789a1b9f6fce71da351e93dceed0d2edbe]
+# We reference it by tag, not by a Docker Hub digest: it is built from source we
+# control (NIST SR provenance), so the "a mutable public tag could later point at
+# a malicious image" risk that motivates digest-pinning the upstream image does
+# not apply here.
 #
-# - Conversely, to get the tag name from the digest:
-#     $ docker image inspect --format "{{.RepoTags}}" docker.io/vaultwarden/web-vault@sha256:ca2a4251c4e63c9ad428262b4dd452789a1b9f6fce71da351e93dceed0d2edbe
-#     [docker.io/vaultwarden/web-vault:v2026.4.1]
+# Upstream reference (what this fork was rebranded from), for the record:
+#   docker.io/vaultwarden/web-vault:v2026.4.1
+#   docker.io/vaultwarden/web-vault@sha256:ca2a4251c4e63c9ad428262b4dd452789a1b9f6fce71da351e93dceed0d2edbe
 #
-FROM --platform=linux/amd64 docker.io/vaultwarden/web-vault@sha256:ca2a4251c4e63c9ad428262b4dd452789a1b9f6fce71da351e93dceed0d2edbe AS vault
+FROM --platform=linux/amd64 localhost/nextvault-web-vault:v2026.4.1 AS vault
 
 ########################## Cross Compile Docker Helper Scripts ##########################
 ## We use the linux/amd64 no matter which Build Platform, since these are all bash scripts
