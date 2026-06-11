@@ -5,9 +5,11 @@ After=nextvault-edge-network.service nextvault-internal-network.service nextvaul
 
 [Container]
 ContainerName=nextvault-caddy
+# Explicit journald driver (CM-6) so the Wazuh agent's journald reader sees this
+# stream (deploy/wazuh/README.md). Podman rootless defaults to journald anyway.
+LogDriver=journald
 # NIST CM-2/SR: pin by digest in production.
 Image=docker.io/library/caddy@sha256:4679412ccd2114dca9f3017e2c460f76c9d8eb9e1850e72fb9ecda672e05c629
-AutoUpdate=local
 # Caddy is the ONLY container on both networks: edge (ingress) + internal (to app).
 Network=nextvault-edge.network
 Network=nextvault-internal.network

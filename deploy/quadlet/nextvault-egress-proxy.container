@@ -10,7 +10,6 @@ ContainerName=nextvault-egress-proxy
 # tag (short image ID) — local-only images have no registry digest.
 # Image ID: sha256:76491042fc757057b4ad427908ed8a11656b83b9e9bf7c0b2cdf8c58b0ad4d6a
 Image=localhost/nextvault-egress-proxy:76491042
-AutoUpdate=local
 
 # On the internal network at a STATIC IP so the app can target it without DNS
 # (reqwest uses a proxy by address; the proxy resolves the upstream host). Also

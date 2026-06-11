@@ -16,12 +16,18 @@ Documentation=file:%h/vaultwarden/deploy/backup/README.md
 # Only meaningful if the DB container is up; don't fail the boot if it isn't.
 Wants=nextvault-postgres.service
 After=nextvault-postgres.service
+# Emit a journald CRITICAL marker on failure (picked up by the Wazuh agent).
+OnFailure=nextvault-backup-failure.service
 
 [Service]
 Type=oneshot
 # Absolute destination so a missing CWD can't silently scatter backups.
 Environment=BACKUP_DEST=%h/vaultwarden/backups
 Environment=RETENTION_DAYS=30
+# `age` (preferred AEAD backend) ships as a static binary under vaultwarden/bin;
+# the minimal user-service PATH wouldn't otherwise find it, so backup.sh would
+# silently fall back to the broken openssl-GCM path.
+Environment=PATH=%h/vaultwarden/bin:/usr/local/bin:/usr/bin:/bin
 # Point this at wherever install puts the scripts (adjust if you relocate them).
 ExecStart=%h/vaultwarden/deploy/backup/backup.sh
 # Don't let a single slow dump pile up runs.

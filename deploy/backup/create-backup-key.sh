@@ -28,7 +28,9 @@ SECRET_NAME="vw_backup_key"
 # A long, high-entropy passphrase. Works for both backends:
 #   - openssl enc  : used as the PBKDF2 passphrase.
 #   - age -p       : used as the scrypt symmetric passphrase (AGE_PASSPHRASE).
-gen_key() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 64; }
+# od reads exactly 32 bytes and exits normally, so the pipe never breaks
+# (tr|head from /dev/urandom dies under pipefail: head's exit SIGPIPEs tr).
+gen_key() { od -An -tx1 -N32 /dev/urandom | tr -d ' \n'; }
 
 if podman secret exists "$SECRET_NAME" 2>/dev/null; then
   if [[ "$FORCE" -eq 1 ]]; then

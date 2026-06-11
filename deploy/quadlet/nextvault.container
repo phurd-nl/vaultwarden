@@ -10,6 +10,9 @@ After=nextvault-egress-proxy.service
 
 [Container]
 ContainerName=nextvault
+# Explicit journald driver (CM-6) so the Wazuh agent's journald reader sees this
+# stream (deploy/wazuh/README.md). Podman rootless defaults to journald anyway.
+LogDriver=journald
 # Built locally from this fork (see deploy/scripts/build-image.sh).
 # NIST CM-2/SR: pinned by immutable per-build tag (short image ID). A local-only
 # image has no registry digest, so @sha256 pinning can't work; each deploy

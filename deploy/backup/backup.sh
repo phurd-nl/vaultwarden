@@ -31,6 +31,7 @@ set -euo pipefail
 BACKUP_DEST="${BACKUP_DEST:-./backups}"          # where backup sets are written
 PG_CONTAINER="${PG_CONTAINER:-nextvault-postgres}"      # running postgres container
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"         # superuser (used for dump only)
+PG_SUPERUSER_SECRET="${PG_SUPERUSER_SECRET:-vw_pg_superuser_password}"  # superuser pw (podman secret)
 PG_DB="${PG_DB:-vaultwarden}"                    # database to dump
 DATA_VOLUME="${DATA_VOLUME:-nextvault-data}"            # app /data podman volume
 BACKUP_KEY_SECRET="${BACKUP_KEY_SECRET:-vw_backup_key}"  # podman secret w/ key
@@ -51,6 +52,8 @@ die()  { printf '%s [backup] ERROR: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" 
 command -v podman >/dev/null 2>&1 || die "podman not found on PATH"
 podman secret exists "$BACKUP_KEY_SECRET" 2>/dev/null \
   || die "podman secret '$BACKUP_KEY_SECRET' missing — run create-backup-key.sh"
+podman secret exists "$PG_SUPERUSER_SECRET" 2>/dev/null \
+  || die "podman secret '$PG_SUPERUSER_SECRET' missing — needed to authenticate pg_dump"
 podman container exists "$PG_CONTAINER" 2>/dev/null \
   || die "container '$PG_CONTAINER' not found (is the stack running?)"
 podman volume exists "$DATA_VOLUME" 2>/dev/null \
@@ -121,8 +124,16 @@ DATA_ENC="$SET_DIR/data-${DATA_VOLUME}.tar.gz.enc"
 
 # 1) Logical DB dump (custom format -> supports selective pg_restore, parallel).
 log "pg_dump ${PG_DB} (custom format) from container ${PG_CONTAINER} ..."
-podman exec "$PG_CONTAINER" pg_dump -U "$PG_SUPERUSER" -Fc "$PG_DB" > "$DB_PLAIN" \
+# scram-sha-256 over the local socket needs a password. Read the superuser
+# secret on the host and pass it through with `-e PGPASSWORD` (name only, no
+# value) so it never appears in podman's argv / `ps` output.
+PGPASSWORD="$(podman secret inspect --showsecret --format '{{.SecretData}}' "$PG_SUPERUSER_SECRET" 2>/dev/null)" \
+  || die "could not read secret '$PG_SUPERUSER_SECRET'"
+[[ -n "$PGPASSWORD" ]] || die "superuser password secret is empty"
+export PGPASSWORD
+podman exec -e PGPASSWORD "$PG_CONTAINER" pg_dump -U "$PG_SUPERUSER" -Fc "$PG_DB" > "$DB_PLAIN" \
   || die "pg_dump failed"
+unset PGPASSWORD
 [[ -s "$DB_PLAIN" ]] || die "pg_dump produced an empty file"
 log "pg_dump ok ($(wc -c <"$DB_PLAIN") bytes)"
 

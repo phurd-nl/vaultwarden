@@ -1,13 +1,16 @@
 [Unit]
 Description=PostgreSQL for Vaultwarden (TLS, least-privilege app role)
-Requires=nextvault-pgdata-volume.service nextvault-internal-network.service
-After=nextvault-pgdata-volume.service nextvault-internal-network.service
+Requires=nextvault-pgdata-volume.service nextvault-pgwal-volume.service nextvault-internal-network.service
+After=nextvault-pgdata-volume.service nextvault-pgwal-volume.service nextvault-internal-network.service
 
 [Container]
 ContainerName=nextvault-postgres
-# NIST CM-2/SR: pin by digest in production. Replace the tag with image@sha256:...
+# Explicit journald driver (CM-6) so the Wazuh agent's journald reader sees this
+# stream (deploy/wazuh/README.md). Podman rootless defaults to journald anyway.
+LogDriver=journald
+# NIST CM-2/SR: pinned by registry content digest (postgres:17.10, the artifact
+# the RA-5 scan gate passed). Updates are deliberate quadlet edits — no AutoUpdate.
 Image=docker.io/library/postgres@sha256:0027bef26712baaee437a4ea48fdf3d2d2e2bc5f0d81615374408ca320f3c7e3
-AutoUpdate=local
 Network=nextvault-internal.network
 # DB is reachable ONLY on the internal network — never published to the host.
 
@@ -26,6 +29,8 @@ Secret=vw_db_app_password,type=mount,mode=0444
 Secret=vw_pg_server_key,type=mount,target=/etc/postgresql/server.key,mode=0400,uid=999,gid=999
 
 Volume=nextvault-pgdata.volume:/var/lib/postgresql/data:Z
+# WAL archive for PITR (NIST CP-9/CP-10) — see deploy/backup/README.md.
+Volume=nextvault-pgwal.volume:/var/lib/postgresql/wal-archive:Z
 Volume=%h/vaultwarden/postgres/init:/docker-entrypoint-initdb.d:ro,Z
 # TLS material from your internal/enterprise CA. The server cert SAN MUST include
 # the hostname "nextvault-postgres" so the app's sslmode=verify-full succeeds.
@@ -43,7 +48,14 @@ Exec=postgres \
   -c log_connections=on \
   -c log_disconnections=on \
   -c log_hostname=on \
-  -c log_line_prefix='%m [%p] %q%u@%d %r '
+  -c log_line_prefix='%m [%p] %q%u@%d %r ' \
+  -c log_statement=ddl \
+  -c archive_mode=on \
+  -c wal_level=replica \
+  -c archive_command='test ! -f /var/lib/postgresql/wal-archive/%f && cp %p /var/lib/postgresql/wal-archive/%f' \
+  -c archive_timeout=300 \
+  -c max_wal_size=1GB \
+  -c log_checkpoints=on
 
 # --- Hardening (NIST AC/SC/SI) ---
 NoNewPrivileges=true
