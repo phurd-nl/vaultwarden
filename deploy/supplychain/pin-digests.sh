@@ -18,8 +18,8 @@ set -euo pipefail
 # ref|quadlet file|kind   (kind: built = local fork, pulled = from a registry)
 SPECS=(
 	"localhost/nextvault:latest|nextvault.container|built"
-	"docker.io/library/postgres:17.5|nextvault-postgres.container|pulled"
-	"docker.io/library/caddy:2.8|nextvault-caddy.container|pulled"
+	"docker.io/library/postgres:17.10|nextvault-postgres.container|pulled"
+	"docker.io/library/caddy:2.11.4|nextvault-caddy.container|pulled"
 )
 
 QUADLET_DIR="${QUADLET_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../quadlet" && pwd)}"
@@ -40,7 +40,7 @@ image_id() {
 	[[ -z "$id" ]] && return
 	[[ "$id" == sha256:* ]] && echo "$id" || echo "sha256:${id}"
 }
-# Name without tag, e.g. docker.io/library/postgres:17.5 -> docker.io/library/postgres
+# Name without tag, e.g. docker.io/library/postgres:17.10 -> docker.io/library/postgres
 name_no_tag() { echo "${1%:*}"; }
 
 # Print the current Image= line from a quadlet (the line we'd replace).

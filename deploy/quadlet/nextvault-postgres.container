@@ -6,7 +6,7 @@ After=nextvault-pgdata-volume.service nextvault-internal-network.service
 [Container]
 ContainerName=nextvault-postgres
 # NIST CM-2/SR: pin by digest in production. Replace the tag with image@sha256:...
-Image=docker.io/library/postgres:17.5
+Image=docker.io/library/postgres:17.10
 AutoUpdate=local
 Network=nextvault-internal.network
 # DB is reachable ONLY on the internal network — never published to the host.

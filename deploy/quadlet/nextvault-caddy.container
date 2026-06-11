@@ -6,7 +6,7 @@ After=nextvault-edge-network.service nextvault-internal-network.service nextvaul
 [Container]
 ContainerName=nextvault-caddy
 # NIST CM-2/SR: pin by digest in production.
-Image=docker.io/library/caddy:2.8
+Image=docker.io/library/caddy:2.11.4
 AutoUpdate=local
 # Caddy is the ONLY container on both networks: edge (ingress) + internal (to app).
 Network=nextvault-edge.network

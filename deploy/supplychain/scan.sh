@@ -36,8 +36,8 @@ GRYPE_CONFIG="${GRYPE_CONFIG:-$HERE/.grype.yaml}"
 
 IMAGES=(
 	"localhost/nextvault:latest"
-	"docker.io/library/postgres:17.5"
-	"docker.io/library/caddy:2.8"
+	"docker.io/library/postgres:17.10"
+	"docker.io/library/caddy:2.11.4"
 )
 
 mkdir -p "$REPORT_DIR"

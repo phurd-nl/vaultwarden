@@ -17,8 +17,8 @@ Three images make up the running stack (`deploy/quadlet/*.container`):
 | Image | Origin | Trust basis |
 |---|---|---|
 | `localhost/nextvault:latest` | **Built from this fork** (`deploy/scripts/build-image.sh`) | Source you control; provenance by build, then digest-pin |
-| `docker.io/library/postgres:17.5` | Pulled (Docker Official Image) | Registry content digest; allowlisted registry |
-| `docker.io/library/caddy:2.8` | Pulled (Docker Official Image) | Registry content digest; allowlisted registry |
+| `docker.io/library/postgres:17.10` | Pulled (Docker Official Image) | Registry content digest; allowlisted registry |
+| `docker.io/library/caddy:2.11.4` | Pulled (Docker Official Image) | Registry content digest; allowlisted registry |
 
 ## Files in this directory
 
@@ -37,8 +37,8 @@ Three images make up the running stack (`deploy/quadlet/*.container`):
 ```bash
 # 0. Prereqs: build/pull the images first.
 deploy/scripts/build-image.sh                 # localhost/nextvault:latest
-podman pull docker.io/library/postgres:17.5
-podman pull docker.io/library/caddy:2.8
+podman pull docker.io/library/postgres:17.10
+podman pull docker.io/library/caddy:2.11.4
 
 # 1. SBOM every image (CycloneDX + SPDX) -> ./sbom/
 deploy/supplychain/sbom.sh
@@ -234,8 +234,8 @@ the exact replacement lines; a human edits and commits them (CM-3 change control
 | File | From | To (example shape) |
 |---|---|---|
 | `deploy/quadlet/nextvault.container` | `Image=localhost/nextvault:latest` | `Image=registry.internal.example.com/nextvault@sha256:...` (after push) |
-| `deploy/quadlet/nextvault-postgres.container` | `Image=docker.io/library/postgres:17.5` | `Image=docker.io/library/postgres@sha256:...` |
-| `deploy/quadlet/nextvault-caddy.container` | `Image=docker.io/library/caddy:2.8` | `Image=docker.io/library/caddy@sha256:...` |
+| `deploy/quadlet/nextvault-postgres.container` | `Image=docker.io/library/postgres:17.10` | `Image=docker.io/library/postgres@sha256:...` |
+| `deploy/quadlet/nextvault-caddy.container` | `Image=docker.io/library/caddy:2.11.4` | `Image=docker.io/library/caddy@sha256:...` |
 
 After editing: `systemctl --user daemon-reload` and restart the units. Re-run
 `sbom.sh` + `scan.sh` whenever a digest changes — the new artifact must be

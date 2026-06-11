@@ -23,8 +23,8 @@ OUT_DIR="${SBOM_OUT_DIR:-$HERE/sbom}"
 # The locally-built fork image is FIRST: build-image.sh must have produced it.
 IMAGES=(
 	"localhost/nextvault:latest"
-	"docker.io/library/postgres:17.5"
-	"docker.io/library/caddy:2.8"
+	"docker.io/library/postgres:17.10"
+	"docker.io/library/caddy:2.11.4"
 )
 
 mkdir -p "$OUT_DIR"

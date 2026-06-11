@@ -31,7 +31,7 @@ set -euo pipefail
 
 PRIMARY_CONTAINER="${PRIMARY_CONTAINER:-nextvault-postgres}"
 PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
-PG_IMAGE="${PG_IMAGE:-docker.io/library/postgres:17.5}"
+PG_IMAGE="${PG_IMAGE:-docker.io/library/postgres:17.10}"
 PG_NETWORK="${PG_NETWORK:-nextvault-internal.network}"
 PRIMARY_HOST="${PRIMARY_HOST:-nextvault-postgres}"          # must match server cert SAN
 PRIMARY_PORT="${PRIMARY_PORT:-5432}"

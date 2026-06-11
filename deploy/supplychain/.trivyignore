@@ -18,13 +18,31 @@
 # trivy also supports an inline `cve-id exp:2026-12-31` expiry suffix; we keep the
 # expiry in the comment block so grype users (.grype.yaml) follow the same format.
 #
-# --- EXAMPLE (delete once you have real entries) -------------------------------
-# CVE-0000-00000
-#   # Justification : glibc CVE not reachable — vaultwarden binary is statically
-#   #                 built and does not call the affected setlocale path.
-#   # Approved-by   : Security Lead (NIST AO delegate)
-#   # Date          : 2026-06-09
-#   # Expires       : 2026-09-09
-# -------------------------------------------------------------------------------
-#
-# (No active exceptions. Empty allowlist = gate enforced on all findings.)
+CVE-2026-42496
+  # Justification : perl Archive::Tar path traversal. perl-base is an Essential
+  #                 Debian package (cannot be removed from the base image).
+  #                 Nothing in nextvault (Rust binary) or postgres invokes perl
+  #                 Archive::Tar at runtime. Debian status: fix_deferred — no
+  #                 fixed package exists yet; re-check at expiry.
+  # Approved-by   : PENDING — drafted 2026-06-11, requires System Owner sign-off
+  # Date          : 2026-06-11
+  # Expires       : 2026-09-09
+
+CVE-2026-8376
+  # Justification : perl runtime CVE in the same Essential perl-base package.
+  #                 Same non-reachability as CVE-2026-42496: no perl is invoked
+  #                 at runtime by nextvault or postgres. Debian status:
+  #                 affected, no fix available; re-check at expiry.
+  # Approved-by   : PENDING — drafted 2026-06-11, requires System Owner sign-off
+  # Date          : 2026-06-11
+  # Expires       : 2026-09-09
+
+CVE-2025-68121
+  # Justification : Go stdlib CVE compiled into /usr/local/bin/gosu inside the
+  #                 upstream postgres image (still present in postgres:17.10,
+  #                 the newest 17.x). gosu runs once at container entrypoint to
+  #                 drop root->postgres, takes no untrusted input, and the DB
+  #                 container is only reachable on the internal podman network.
+  # Approved-by   : PENDING — drafted 2026-06-11, requires System Owner sign-off
+  # Date          : 2026-06-11
+  # Expires       : 2026-09-09

@@ -198,7 +198,7 @@ deploy/backup/restore.sh --list
 podman volume create nextvault-data-test
 podman run -d --name nextvault-postgres-test \
   --network=none -e POSTGRES_PASSWORD=test -e POSTGRES_DB=vaultwarden \
-  -v nextvault-pgdata-test:/var/lib/postgresql/data docker.io/library/postgres:17.5
+  -v nextvault-pgdata-test:/var/lib/postgresql/data docker.io/library/postgres:17.10
 
 # 2. Restore the SET into the isolated targets (point the script at them):
 PG_CONTAINER=nextvault-postgres-test PG_SUPERUSER=postgres PG_DB=vaultwarden \
@@ -211,7 +211,7 @@ DATA_VOLUME=nextvault-data-test \
 podman exec nextvault-postgres-test psql -U postgres -d vaultwarden \
   -c "select count(*) from users;" -c "select count(*) from ciphers;"
 #    - Data: rsa_key.pem / config.json present, attachments/ and sends/ restored.
-podman run --rm --network=none -v nextvault-data-test:/d:ro docker.io/library/postgres:17.5 \
+podman run --rm --network=none -v nextvault-data-test:/d:ro docker.io/library/postgres:17.10 \
   sh -c 'ls -la /d && test -f /d/rsa_key.pem && echo "rsa key present"'
 
 # 4. KEEP ROLLBACK: only after validation, restore production — and FIRST take a

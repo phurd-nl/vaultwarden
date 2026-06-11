@@ -13,7 +13,7 @@ After=nextvault-standby-pgdata-volume.service nextvault-internal-network.service
 ContainerName=nextvault-postgres-standby
 # SAME postgres image (and digest) as the primary — replication requires the
 # major version to match. Pin by digest in production.
-Image=docker.io/library/postgres:17.5
+Image=docker.io/library/postgres:17.10
 AutoUpdate=local
 Network=nextvault-internal.network
 # Replica is reachable ONLY on the internal network — never published.

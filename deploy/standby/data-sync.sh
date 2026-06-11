@@ -44,7 +44,7 @@ set -euo pipefail
 MODE="${MODE:-twohost}"                       # twohost | shared | local
 SRC_VOLUME="${SRC_VOLUME:-nextvault-data}"
 DST_VOLUME="${DST_VOLUME:-nextvault-standby-data}"       # used in MODE=local (single host)
-PG_IMAGE="${PG_IMAGE:-docker.io/library/postgres:17.5}"  # any image with rsync; reuse a present one
+PG_IMAGE="${PG_IMAGE:-docker.io/library/postgres:17.10}"  # any image with rsync; reuse a present one
 
 # MODE=twohost settings — EDIT for your standby host.
 STANDBY_SSH="${STANDBY_SSH:-deploy@standby-host}"     # ssh user@host of the standby

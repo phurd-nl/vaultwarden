@@ -27,7 +27,7 @@ PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
 PG_DB="${PG_DB:-vaultwarden}"
 DATA_VOLUME="${DATA_VOLUME:-nextvault-data}"
 BACKUP_KEY_SECRET="${BACKUP_KEY_SECRET:-vw_backup_key}"
-HELPER_IMAGE="${HELPER_IMAGE:-docker.io/library/postgres:17.5}"
+HELPER_IMAGE="${HELPER_IMAGE:-docker.io/library/postgres:17.10}"
 FORCE="${FORCE:-0}"
 
 DO_DB=0

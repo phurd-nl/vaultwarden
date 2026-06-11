@@ -37,7 +37,7 @@ BACKUP_KEY_SECRET="${BACKUP_KEY_SECRET:-vw_backup_key}"  # podman secret w/ key
 # Tiny, pinned helper image for the throwaway volume-tar container. Reuse the
 # postgres image already present on the host to avoid an extra pull; only its
 # `tar` + `sh` are used (read-only mount, so nothing is written back).
-HELPER_IMAGE="${HELPER_IMAGE:-docker.io/library/postgres:17.5}"
+HELPER_IMAGE="${HELPER_IMAGE:-docker.io/library/postgres:17.10}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"           # prune sets older than N days; 0=keep all
 
 TS="$(date -u +%Y%m%dT%H%M%SZ)"                  # NIST: all timestamps UTC
