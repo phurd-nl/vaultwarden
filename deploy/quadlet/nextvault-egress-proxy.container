@@ -6,8 +6,10 @@ After=nextvault-internal-network.service nextvault-egress-network.service
 [Container]
 ContainerName=nextvault-egress-proxy
 # Minimal alpine + tinyproxy, built from this repo (NIST SR-3/CM-2: controlled
-# source). See deploy/egress-proxy/Containerfile. Pin by digest in production.
-Image=localhost/nextvault-egress-proxy:latest
+# source). See deploy/egress-proxy/Containerfile. Pinned by immutable per-build
+# tag (short image ID) — local-only images have no registry digest.
+# Image ID: sha256:76491042fc757057b4ad427908ed8a11656b83b9e9bf7c0b2cdf8c58b0ad4d6a
+Image=localhost/nextvault-egress-proxy:76491042
 AutoUpdate=local
 
 # On the internal network at a STATIC IP so the app can target it without DNS

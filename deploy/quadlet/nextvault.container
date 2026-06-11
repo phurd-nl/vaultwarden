@@ -11,9 +11,12 @@ After=nextvault-egress-proxy.service
 [Container]
 ContainerName=nextvault
 # Built locally from this fork (see deploy/scripts/build-image.sh).
-# NIST CM-2/SR: pin by digest in production (localhost/nextvault@sha256:...).
-Image=localhost/nextvault:latest
-AutoUpdate=local
+# NIST CM-2/SR: pinned by immutable per-build tag (short image ID). A local-only
+# image has no registry digest, so @sha256 pinning can't work; each deploy
+# retags the new build and updates this line deliberately. AutoUpdate was
+# removed for the same reason — updates must be explicit quadlet edits.
+# Image ID: sha256:9985541d74dee240bd8ab4a9481d5e97ab73704678e852b97a8c8ea2f0d7d97a
+Image=localhost/nextvault:9985541d
 # Static internal IP. The container name "nextvault" collides with the VM
 # hostname (host /etc/hosts maps 127.0.1.1 nextvault, which podman copies into
 # every container and shadows aardvark-DNS), so Caddy must target the app by IP,
