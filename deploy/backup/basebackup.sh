@@ -64,9 +64,10 @@ chmod 600 "$KEY_FILE"; [[ -s "$KEY_FILE" ]] || die "key empty"
 encrypt() {
   local src="$1" dst="$2"
   case "$ENC_BACKEND" in
-    age) AGE_PASSPHRASE="$(cat "$KEY_FILE")" age -p -o "$dst" "$src" 2>/dev/null \
-           || { unset AGE_PASSPHRASE; die "age encrypt failed"; }; unset AGE_PASSPHRASE ;;
-    openssl) openssl enc -aes-256-gcm -salt -pbkdf2 -iter 600000 -pass "file:$KEY_FILE" \
+    age) local recip; recip="$(age-keygen -y "$KEY_FILE" 2>/dev/null)" \
+           || die "could not derive age recipient (is the secret an age identity?)"
+         age -r "$recip" -o "$dst" "$src" || die "age encrypt failed" ;;
+    openssl) openssl enc -aes-256-ctr -salt -pbkdf2 -iter 600000 -pass "file:$KEY_FILE" \
                -in "$src" -out "$dst" || die "openssl encrypt failed" ;;
   esac
 }

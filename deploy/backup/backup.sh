@@ -96,16 +96,21 @@ encrypt() {
   local src="$1" dst="$2"
   case "$ENC_BACKEND" in
     age)
-      # Symmetric: the secret value is used as the passphrase. AGE_PASSPHRASE
-      # avoids an interactive prompt; -p selects scrypt symmetric mode.
-      AGE_PASSPHRASE="$(cat "$KEY_FILE")" age -p -o "$dst" "$src" 2>/dev/null \
-        || { unset AGE_PASSPHRASE; die "age encryption failed for $src"; }
-      unset AGE_PASSPHRASE
+      # Asymmetric identity mode: the secret is an age X25519 IDENTITY
+      # (AGE-SECRET-KEY-...). Encrypting to its derived recipient needs no
+      # passphrase/TTY, so this runs cleanly under systemd. (The released
+      # FiloSottile `age -p` ignores AGE_PASSPHRASE and demands a terminal.)
+      local recip
+      recip="$(age-keygen -y "$KEY_FILE" 2>/dev/null)" \
+        || die "could not derive age recipient from key (is the secret an age identity?)"
+      age -r "$recip" -o "$dst" "$src" \
+        || die "age encryption failed for $src"
       ;;
     openssl)
-      # AES-256-GCM (AEAD: confidentiality + integrity). Key derived from the
-      # secret via PBKDF2 with a random salt embedded in the output header.
-      openssl enc -aes-256-gcm -salt -pbkdf2 -iter 600000 \
+      # Fallback only (age preferred). The openssl CLI cannot do AEAD/GCM
+      # ('enc: AEAD ciphers not supported'), so use AES-256-CTR; the set's
+      # SHA256SUMS provides the corruption-detection the AEAD tag would have.
+      openssl enc -aes-256-ctr -salt -pbkdf2 -iter 600000 \
         -pass "file:$KEY_FILE" -in "$src" -out "$dst" \
         || die "openssl encryption failed for $src"
       ;;

@@ -25,12 +25,14 @@ FORCE=0
 
 SECRET_NAME="vw_backup_key"
 
-# A long, high-entropy passphrase. Works for both backends:
-#   - openssl enc  : used as the PBKDF2 passphrase.
-#   - age -p       : used as the scrypt symmetric passphrase (AGE_PASSPHRASE).
-# od reads exactly 32 bytes and exits normally, so the pipe never breaks
-# (tr|head from /dev/urandom dies under pipefail: head's exit SIGPIPEs tr).
-gen_key() { od -An -tx1 -N32 /dev/urandom | tr -d ' \n'; }
+# An age X25519 IDENTITY (AGE-SECRET-KEY-...). Used by both backends:
+#   - age     : the identity; backups encrypt to its derived recipient (-r) and
+#               decrypt with it (-i). Non-interactive — works under systemd
+#               (unlike `age -p`, which needs a TTY).
+#   - openssl : the identity string doubles as the PBKDF2 passphrase (fallback).
+# Requires age-keygen on PATH (shipped alongside age).
+command -v age-keygen >/dev/null 2>&1 || { echo "ERROR: age-keygen not on PATH" >&2; exit 1; }
+gen_key() { age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-'; }
 
 if podman secret exists "$SECRET_NAME" 2>/dev/null; then
   if [[ "$FORCE" -eq 1 ]]; then
@@ -43,17 +45,21 @@ if podman secret exists "$SECRET_NAME" 2>/dev/null; then
 fi
 
 KEY="$(gen_key)"
+[[ "$KEY" == AGE-SECRET-KEY-* ]] || { echo "ERROR: failed to generate age identity" >&2; exit 1; }
 printf '%s' "$KEY" | podman secret create "$SECRET_NAME" - >/dev/null
-echo "[ok]   created secret '$SECRET_NAME'"
+RECIPIENT="$(printf '%s' "$KEY" | age-keygen -y - 2>/dev/null)"
+echo "[ok]   created secret '$SECRET_NAME' (age identity; recipient $RECIPIENT)"
 
 cat <<EOF
 
 --------------------------------------------------------------------------
-BACKUP ENCRYPTION KEY (escrow this NOW, then clear your scrollback):
+BACKUP ENCRYPTION KEY — age identity (escrow this NOW, then clear scrollback):
 
   $KEY
 
-NIST SC-12/SC-28/IA-5 — store this key SEPARATELY from the backups:
+  (public recipient, safe to keep with the backups: $RECIPIENT)
+
+NIST SC-12/SC-28/IA-5 — store the SECRET KEY above SEPARATELY from the backups:
   * password manager / KMS / HSM entry, AND
   * an offsite copy in a different trust domain than the backup media.
 

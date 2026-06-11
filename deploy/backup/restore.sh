@@ -122,11 +122,11 @@ decrypt() {
   local src="$1" dst="$2"
   case "$DEC_BACKEND" in
     age)
-      AGE_PASSPHRASE="$(cat "$KEY_FILE")" age -d -o "$dst" "$src" 2>/dev/null \
-        || { unset AGE_PASSPHRASE; die "age decryption failed (wrong key?) for $src"; }
-      unset AGE_PASSPHRASE ;;
+      # Identity mode (matches backup.sh): the secret is the age identity.
+      age -d -i "$KEY_FILE" -o "$dst" "$src" 2>/dev/null \
+        || die "age decryption failed (wrong key?) for $src" ;;
     openssl)
-      openssl enc -d -aes-256-gcm -salt -pbkdf2 -iter 600000 \
+      openssl enc -d -aes-256-ctr -salt -pbkdf2 -iter 600000 \
         -pass "file:$KEY_FILE" -in "$src" -out "$dst" \
         || die "openssl decryption failed (wrong key?) for $src" ;;
   esac
