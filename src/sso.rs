@@ -170,6 +170,16 @@ fn decode_token_claims(token_name: &str, token: &str) -> ApiResult<BasicTokenCla
     }
 }
 
+/// Extract a string claim (e.g. `department`) from an already-verified id_token.
+/// openidconnect drops non-standard claims (we use `EmptyAdditionalClaims`), so we
+/// read the configured claim directly from the token payload. The signature and
+/// nonce of this exact token were already validated by `id_token.claims(...)` in
+/// `exchange_code`, so an insecure (signature-skipping) decode here is safe.
+fn extract_id_token_claim(id_token_jwt: &str, claim: &str) -> Option<String> {
+    let decoded = jsonwebtoken::dangerous::insecure_decode::<serde_json::Value>(id_token_jwt).ok()?;
+    decoded.claims.get(claim).and_then(serde_json::Value::as_str).map(str::to_owned)
+}
+
 pub fn decode_state(base64_state: &str) -> ApiResult<OIDCState> {
     let state = if let Ok(vec) = data_encoding::BASE64.decode(base64_state.as_bytes()) {
         if let Ok(valid) = String::from_utf8(vec) {
@@ -290,6 +300,18 @@ pub async fn exchange_code(
 
     let user_name = id_claims.preferred_username().or(user_info.preferred_username()).map(|un| un.to_string());
 
+    // Department claim for SSO department-collection sync. openidconnect discards
+    // non-standard claims, so read it from the raw (already signature/nonce
+    // verified) id_token. Only bother when the feature is enabled.
+    let department = if CONFIG.sso_sync_department_collections() {
+        token_response
+            .extra_fields()
+            .id_token()
+            .and_then(|idt| extract_id_token_claim(&idt.to_string(), CONFIG.sso_department_claim().trim()))
+    } else {
+        None
+    };
+
     let refresh_token = token_response.refresh_token().map(openidconnect::RefreshToken::secret);
     if refresh_token.is_none() && CONFIG.sso_scopes_vec().contains(&"offline_access".to_owned()) {
         error!("Scope offline_access is present but response contain no refresh_token");
@@ -305,6 +327,7 @@ pub async fn exchange_code(
         email: email.clone(),
         email_verified,
         user_name: user_name.clone(),
+        department,
     };
 
     debug!("Authenticated user {authenticated_user:?}");

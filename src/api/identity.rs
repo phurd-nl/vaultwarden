@@ -343,6 +343,10 @@ async fn sso_login(
     // (best-effort; never aborts login). See src/sso_enroll.rs.
     crate::sso_enroll::ensure_default_org_membership(&user, conn).await;
 
+    // NIST AC-2/AC-6: reconcile department-vault collection access from the
+    // SSO department claim (best-effort; never aborts login). See src/sso_dept.rs.
+    crate::sso_dept::sync_department_access(&user.uuid, user_infos.department.as_deref(), conn).await;
+
     // We passed 2FA get auth tokens
     let auth_tokens = sso::redeem(&device, &user, data.client_id, sso_user, sso_auth, user_infos, conn).await?;
 

@@ -63,6 +63,7 @@ mod ratelimit;
 mod sso;
 mod sso_client;
 mod sso_enroll; // SSO default-organization auto-enrollment (NIST AC-2)
+mod sso_dept; // SSO department-based collection assignment (NIST AC-2/AC-6)
 mod storage;
 mod util;
 

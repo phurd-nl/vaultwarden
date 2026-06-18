@@ -855,6 +855,10 @@ make_config! {
         sso_debug_tokens:               bool,   true,   def,    false;
         /// Default organization for SSO auto-enrollment |> When set to an organization UUID, every SSO login ensures the user is a member of that organization (role User, in Accepted state pending admin confirmation). Empty disables auto-enrollment.
         sso_default_org:                String, true,   def,    String::new();
+        /// Sync department collections from SSO |> When enabled, each SSO login reconciles the user's access to "department vault" collections (collections tagged with a plaintext external_id) in the default org against their department claim: grants the matching collection, revokes other department collections. Requires SSO_DEFAULT_ORG.
+        sso_sync_department_collections: bool,  true,   def,    false;
+        /// SSO department claim name |> Name of the id_token claim that carries the user's department (matched case-insensitively against each department collection's external_id). For Microsoft Entra ID add `department` as an optional claim.
+        sso_department_claim:           String, true,   def,    "department".to_owned();
     },
 
     /// Yubikey settings
