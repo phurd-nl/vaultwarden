@@ -62,6 +62,7 @@ mod nist_session; // NIST AC-11/AC-12 session timeout logic (additive)
 mod ratelimit;
 mod sso;
 mod sso_client;
+mod sso_enroll; // SSO default-organization auto-enrollment (NIST AC-2)
 mod storage;
 mod util;
 

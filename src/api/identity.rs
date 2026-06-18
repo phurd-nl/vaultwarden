@@ -339,6 +339,10 @@ async fn sso_login(
     // Set the user_uuid here to be passed back used for event logging.
     *user_id = Some(user.uuid.clone());
 
+    // NIST AC-2: drop SSO-authenticated users into the configured default org
+    // (best-effort; never aborts login). See src/sso_enroll.rs.
+    crate::sso_enroll::ensure_default_org_membership(&user, conn).await;
+
     // We passed 2FA get auth tokens
     let auth_tokens = sso::redeem(&device, &user, data.client_id, sso_user, sso_auth, user_infos, conn).await?;
 

@@ -853,6 +853,8 @@ make_config! {
         sso_client_cache_expiration:    u64,    true,   def,    0;
         /// Log all tokens |> `LOG_LEVEL=debug` or `LOG_LEVEL=info,vaultwarden::sso=debug` is required
         sso_debug_tokens:               bool,   true,   def,    false;
+        /// Default organization for SSO auto-enrollment |> When set to an organization UUID, every SSO login ensures the user is a member of that organization (role User, in Accepted state pending admin confirmation). Empty disables auto-enrollment.
+        sso_default_org:                String, true,   def,    String::new();
     },
 
     /// Yubikey settings
