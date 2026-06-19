@@ -11,6 +11,12 @@
 //! collection whose `external_id` matches their department claim and removed
 //! from any other external_id-tagged collection. Collections without an
 //! `external_id` are manual and never touched.
+//!
+//! Aliases: a collection's `external_id` may hold several department strings
+//! separated by `|` (e.g. `Voice over IP|VoIP`). The user matches the collection
+//! if their department equals ANY alias (case-insensitive, trimmed). This lets a
+//! single department vault absorb the spelling/format variants that real
+//! directories accumulate without normalizing the source attribute.
 
 use crate::{
     db::{
@@ -40,14 +46,21 @@ pub enum DeptAction {
 /// Pure reconciliation: given the user's department claim and the set of
 /// department-tagged collections, return the grant/revoke actions needed.
 ///
-/// Matching is case-insensitive after trimming. A missing/empty department
-/// revokes the user from every department collection they are in.
+/// Matching is case-insensitive after trimming. An `external_id` may carry
+/// several `|`-delimited aliases; the user matches if their department equals
+/// any one of them. A missing/empty department revokes the user from every
+/// department collection they are in.
 pub fn reconcile_department_access(department: Option<&str>, dept_collections: &[DeptColl]) -> Vec<DeptAction> {
     let dept = department.map(str::trim).filter(|d| !d.is_empty());
 
     let mut actions = Vec::new();
     for coll in dept_collections {
-        let matches = dept.is_some_and(|d| d.eq_ignore_ascii_case(coll.external_id.trim()));
+        let matches = dept.is_some_and(|d| {
+            coll.external_id.split('|').any(|alias| {
+                let alias = alias.trim();
+                !alias.is_empty() && d.eq_ignore_ascii_case(alias)
+            })
+        });
         match (matches, coll.is_member) {
             (true, false) => actions.push(DeptAction::Grant(coll.collection_uuid.clone())),
             (false, true) => actions.push(DeptAction::Revoke(coll.collection_uuid.clone())),
@@ -169,5 +182,40 @@ mod tests {
         let colls = vec![coll("c-fin", "Finance", true)];
         let actions = reconcile_department_access(Some("Marketing"), &colls);
         assert_eq!(actions, vec![DeptAction::Revoke(CollectionId::from("c-fin".to_string()))]);
+    }
+
+    #[test]
+    fn grants_when_department_matches_any_pipe_alias() {
+        let colls = vec![coll("c-voip", "Voice over IP|VoIP", false)];
+        // Either spelling grants the same collection.
+        assert_eq!(
+            reconcile_department_access(Some("VoIP"), &colls),
+            vec![DeptAction::Grant(CollectionId::from("c-voip".to_string()))]
+        );
+        assert_eq!(
+            reconcile_department_access(Some("  voice over ip "), &colls),
+            vec![DeptAction::Grant(CollectionId::from("c-voip".to_string()))]
+        );
+    }
+
+    #[test]
+    fn revokes_aliased_collection_when_no_alias_matches() {
+        let colls = vec![coll("c-voip", "Voice over IP|VoIP", true)];
+        assert_eq!(
+            reconcile_department_access(Some("Marketing"), &colls),
+            vec![DeptAction::Revoke(CollectionId::from("c-voip".to_string()))]
+        );
+    }
+
+    #[test]
+    fn empty_aliases_from_stray_pipes_never_match() {
+        // A stray/trailing pipe must not produce an empty alias that matches an
+        // empty-ish department; non-empty departments simply don't match empties.
+        let colls = vec![coll("c-x", "Engineering||", false)];
+        assert_eq!(
+            reconcile_department_access(Some("Engineering"), &colls),
+            vec![DeptAction::Grant(CollectionId::from("c-x".to_string()))]
+        );
+        assert!(reconcile_department_access(Some(" "), &colls).is_empty());
     }
 }
