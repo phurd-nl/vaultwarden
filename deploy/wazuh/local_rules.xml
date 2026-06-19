@@ -1,0 +1,226 @@
+<!--
+  Custom Wazuh rules for the Vaultwarden stack.
+  Deploy to the MANAGER at /var/ossec/etc/rules/local_rules.xml
+  (rule evaluation runs manager-side; see README.md).
+
+  Rule ID range: 100000+ (Wazuh-reserved local range).
+  Levels: 0-3 informational, 4-6 notable, 7-9 alertable, 10-12 high,
+  13-15 critical. The mapping to NIST controls is in README.md.
+
+  How the JSON fields appear: the built-in "json" decoder exposes audit fields
+  by name. event_name is the primary selector. Admin events (emit_named) have
+  ts/event_name/(user_uuid)/(ip) only; EventType events (emit) also carry
+  event_type/user_uuid/act_user_uuid/etc.
+-->
+<group name="nextvault,nist,audit,">
+
+  <!-- ============================================================= -->
+  <!-- Parent: any decoded Vaultwarden audit JSON line.              -->
+  <!-- event_name is always present on both emit() and emit_named(). -->
+  <!-- Level 0 = no alert by itself; children raise the real alerts. -->
+  <!-- ============================================================= -->
+  <rule id="100000" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="event_name">\.+</field>
+    <description>Vaultwarden audit event (base rule)</description>
+  </rule>
+
+  <!-- ============================================================= -->
+  <!-- /admin access attempt + admin auth outcomes (NIST AC-6/AU-6). -->
+  <!-- ============================================================= -->
+
+  <!-- Successful /admin login. Notable (privileged access used). -->
+  <rule id="100001" level="6">
+    <if_sid>100000</if_sid>
+    <field name="event_name">^admin.login.success$</field>
+    <description>Vaultwarden /admin login SUCCESS from $(ip)</description>
+    <mitre>
+      <id>T1078.001</id>
+    </mitre>
+    <group>authentication_success,gdpr_IV_32.2,</group>
+  </rule>
+
+  <!-- Failed /admin login. Higher — admin brute force / misuse signal. -->
+  <rule id="100002" level="10">
+    <if_sid>100000</if_sid>
+    <field name="event_name">^admin.login.failure$</field>
+    <description>Vaultwarden /admin login FAILURE from $(ip)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <!-- Repeated failed /admin logins => active brute force (NIST AC-7/SI-4). -->
+  <rule id="100003" level="13" frequency="5" timeframe="300">
+    <if_matched_sid>100002</if_matched_sid>
+    <same_field>ip</same_field>
+    <description>Vaultwarden /admin login brute force: 5+ failures in 5m from $(ip)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <!-- Registration / invitation (and any) admin config change (NIST CM-3/CM-6).
+       admin.config.changed fires whenever /admin writes config.json, which is
+       the path that toggles signups_allowed / invitations_allowed etc. -->
+  <rule id="100004" level="9">
+    <if_sid>100000</if_sid>
+    <field name="event_name">^admin.config.changed$</field>
+    <description>Vaultwarden admin configuration changed from $(ip) (registration/invitation settings may have changed)</description>
+    <mitre>
+      <id>T1098</id>
+    </mitre>
+    <group>config_changed,</group>
+  </rule>
+
+  <!-- ============================================================= -->
+  <!-- Account lockout + lockout-blocked login (NIST AC-7).          -->
+  <!-- ============================================================= -->
+
+  <!-- A user account just crossed the failed-login threshold and was locked. -->
+  <rule id="100010" level="10">
+    <if_sid>100000</if_sid>
+    <field name="event_name">^user.locked$</field>
+    <description>Vaultwarden account LOCKED (AC-7 threshold reached) user $(user_uuid) from $(ip)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>account_lockout,</group>
+  </rule>
+
+  <!-- Login attempt against an already-locked account (lockout doing its job,
+       but repetition signals continued targeting). -->
+  <rule id="100011" level="7">
+    <if_sid>100000</if_sid>
+    <field name="event_name">^user.login.locked$</field>
+    <description>Vaultwarden login attempt on LOCKED account user $(user_uuid) from $(ip)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>account_lockout,</group>
+  </rule>
+
+  <!-- ============================================================= -->
+  <!-- User failed-login volume (NIST AC-7/SI-4).                    -->
+  <!-- ============================================================= -->
+
+  <!-- Single user failed login. Low on its own; feeds the frequency rule. -->
+  <rule id="100020" level="4">
+    <if_sid>100000</if_sid>
+    <field name="event_name">^user_failed_login$</field>
+    <description>Vaultwarden user failed login user $(user_uuid) from $(ip)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <!-- Volume rule: many user failed logins from the same source IP in a short
+       window => credential stuffing / brute force across accounts. -->
+  <rule id="100021" level="12" frequency="8" timeframe="120">
+    <if_matched_sid>100020</if_matched_sid>
+    <same_field>ip</same_field>
+    <description>Vaultwarden user-login brute force: 8+ failed logins in 2m from $(ip)</description>
+    <mitre>
+      <id>T1110.003</id>
+    </mitre>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <!-- ============================================================= -->
+  <!-- Session idle timeout (NIST AC-12).                            -->
+  <!-- ============================================================= -->
+  <rule id="100030" level="5">
+    <if_sid>100000</if_sid>
+    <field name="event_name">^user.session.idle_timeout$</field>
+    <description>Vaultwarden session terminated on idle timeout (AC-12) user $(user_uuid) from $(ip)</description>
+    <group>session_timeout,</group>
+  </rule>
+
+</group>
+
+
+<!-- ================================================================= -->
+<!-- Caddy edge: /admin access attempts at the proxy (defense-in-depth -->
+<!-- alongside app admin.login.* — NIST AC-6/SC-7). Caddy access logs   -->
+<!-- are JSON; fields are request.uri, request.remote_ip, status.       -->
+<!-- ================================================================= -->
+<group name="nextvault,caddy,nist,">
+
+  <rule id="100100" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="request.uri">^/admin</field>
+    <description>Caddy: request to /admin (base rule)</description>
+  </rule>
+
+  <!-- Any reach to /admin through the proxy is worth recording. -->
+  <rule id="100101" level="5">
+    <if_sid>100100</if_sid>
+    <description>Caddy: /admin accessed via proxy from $(request.remote_ip) status $(status)</description>
+    <group>web,access_control,</group>
+  </rule>
+
+  <!-- 403 => the remote_ip allowlist blocked an /admin attempt from outside the
+       approved networks. Stronger signal (someone is probing /admin). -->
+  <rule id="100102" level="9">
+    <if_sid>100100</if_sid>
+    <field name="status">^403$</field>
+    <description>Caddy: /admin access DENIED by allowlist (403) from $(request.remote_ip)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>web,access_denied,</group>
+  </rule>
+
+</group>
+
+
+<!-- ================================================================= -->
+<!-- PostgreSQL: DB authentication failures (NIST AC-7/IA-5/AU-6).     -->
+<!-- Decoded by nextvault-postgres* decoders in local_decoder.xml.            -->
+<!-- ================================================================= -->
+<group name="nextvault,postgres,nist,">
+
+  <rule id="100200" level="0">
+    <decoded_as>nextvault-postgres</decoded_as>
+    <description>PostgreSQL log line (base rule)</description>
+  </rule>
+
+  <!-- FATAL password authentication failed. A failed DB login should be rare
+       and is a strong tampering / lateral-movement signal. -->
+  <rule id="100201" level="10">
+    <if_sid>100200</if_sid>
+    <decoded_as>nextvault-postgres-auth-fail</decoded_as>
+    <description>PostgreSQL authentication FAILURE for user $(dstuser)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <!-- Repeated DB auth failures => DB brute force / compromised app creds. -->
+  <rule id="100202" level="13" frequency="5" timeframe="120">
+    <if_matched_sid>100201</if_matched_sid>
+    <same_field>dstuser</same_field>
+    <description>PostgreSQL authentication brute force: 5+ failures in 2m for user $(dstuser)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <!-- Connection rejected by pg_hba (non-TLS / missing client cert / no entry).
+       Signals a policy-violating connection reaching the DB (SC-7/SC-8). -->
+  <rule id="100203" level="9">
+    <if_sid>100200</if_sid>
+    <decoded_as>nextvault-postgres-no-pg_hba</decoded_as>
+    <description>PostgreSQL connection rejected by pg_hba policy (TLS/client-cert/entry)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>access_denied,</group>
+  </rule>
+
+</group>

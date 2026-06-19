@@ -220,6 +220,16 @@ async fn post_events_collect(data: Json<Vec<EventCollection>>, headers: Headers,
 }
 
 pub async fn log_user_event(event_type: i32, user_id: &UserId, device_type: i32, ip: &IpAddr, conn: &DbConn) {
+    // NIST AU audit hook (additive, ADR-0002): emit before the org_events_enabled gate.
+    crate::audit::emit(
+        event_type,
+        None,
+        Some(user_id.as_ref()),
+        Some(user_id.as_ref()),
+        None,
+        Some(device_type),
+        Some(&ip.to_string()),
+    );
     if !CONFIG.org_events_enabled() {
         return;
     }
@@ -269,6 +279,16 @@ pub async fn log_event(
     ip: &IpAddr,
     conn: &DbConn,
 ) {
+    // NIST AU audit hook (additive, ADR-0002): emit before the org_events_enabled gate.
+    crate::audit::emit(
+        event_type,
+        Some(source_uuid),
+        None,
+        Some(act_user_id.as_ref()),
+        Some(org_id.as_ref()),
+        Some(device_type),
+        Some(&ip.to_string()),
+    );
     if !CONFIG.org_events_enabled() {
         return;
     }

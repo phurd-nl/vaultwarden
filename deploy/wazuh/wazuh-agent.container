@@ -1,0 +1,57 @@
+[Unit]
+Description=Wazuh agent sidecar — log shipping + alerting for Vaultwarden (NIST AU-6/SI-4/IR-4)
+# Start after the stack so there is something to read. The agent does not gate
+# the app: if Wazuh is down the app keeps serving (AU-5 graceful degradation).
+After=nextvault.service nextvault-caddy.service nextvault-postgres.service
+Wants=nextvault.service
+
+[Container]
+ContainerName=wazuh-agent
+# NIST CM-2/SR: pin by digest in production. Match the agent minor version to
+# the Wazuh manager you enroll against (mismatched majors will not connect).
+Image=docker.io/wazuh/wazuh-agent:4.9.2
+AutoUpdate=local
+# The agent ships logs OUTBOUND to the manager only; it needs egress, so it
+# lives on the edge network, NOT the internal one (SC-7 keeps it off the DB net).
+Network=nextvault-edge.network
+
+# --- Manager / enrollment (operator fills these at deploy) ---
+# WAZUH_MANAGER + WAZUH_REGISTRATION_SERVER: DNS/IP of your Wazuh manager.
+# WAZUH_AGENT_NAME / WAZUH_AGENT_GROUP: how this host shows up in the manager.
+# The shared enrollment password comes from a podman secret, NOT this file
+# (NIST IA-5: the pre-shared key never lands in a quadlet or in git).
+EnvironmentFile=%h/vaultwarden/wazuh/wazuh-agent.env
+Secret=vw_wazuh_enrollment_key,type=mount,target=/run/secrets/vw_wazuh_enrollment_key,mode=0400
+
+# Operator-managed agent config (ossec.conf) + custom decoders/rules. Mounted
+# read-only as code (NIST CM): edits go through this repo + install.sh, not the
+# running container.
+Volume=%h/vaultwarden/wazuh/ossec.conf:/wazuh-config-mount/etc/ossec.conf:ro,Z
+
+# --- Log source: host journald (chosen strategy, see README.md) ---
+# The app/caddy/postgres containers are switched to LogDriver=journald (see the
+# documented, non-applied quadlet change in README.md). The agent reads the host
+# journal read-only and forwards the relevant units. Rootless podman writes to
+# the *user* journal under ~/.local/share/... but the agent reads the system
+# journal at /var/log/journal; for rootless, bind the user journal instead (see
+# README "Rootless vs rootful journald").
+Volume=/var/log/journal:/var/log/journal:ro
+Volume=/run/log/journal:/run/log/journal:ro
+# machine-id is required for the journald reader to resolve the boot ids.
+Volume=/etc/machine-id:/etc/machine-id:ro
+
+# --- Hardening (NIST AC-6/SC) ---
+# The agent must read journald and run wazuh-modulesd/logcollector; it cannot be
+# fully read-only or all-caps-dropped like the app. Keep it unprivileged with
+# NoNewPrivileges and a tight memory/cpu budget.
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=DAC_READ_SEARCH SETGID SETUID
+PodmanArgs=--memory=256m --cpus=0.5 --health-cmd="/var/ossec/bin/wazuh-control status" --health-interval=60s
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

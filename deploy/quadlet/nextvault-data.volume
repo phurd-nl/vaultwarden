@@ -1,0 +1,11 @@
+[Unit]
+Description=Vaultwarden /data (attachments, sends, rsa keys, config.json)
+
+[Volume]
+VolumeName=nextvault-data
+# NIST MP/SC: place the backing store on encrypted-at-rest storage. With rootless
+# podman this volume lives under ~/.local/share/containers/storage/volumes; ensure
+# that path is on a LUKS/encrypted filesystem (documented in deploy/README.md).
+
+[Install]
+WantedBy=default.target

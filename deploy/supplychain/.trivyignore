@@ -1,0 +1,48 @@
+# Vulnerability exception allowlist (NIST RA-5 / SI-2 exception process).
+#
+# scan.sh passes this file to `trivy --ignorefile`. A CVE listed here is
+# EXCLUDED from the severity gate: it has been reviewed and ACCEPTED (false
+# positive, not reachable in this deployment, or no fix yet available).
+#
+# RULES (the exception process — enforced by review, not the tool):
+#   1. One CVE ID per line.
+#   2. Every entry MUST have the comment block below it filled in:
+#        - Justification : why this finding is accepted (reachability / no-fix / FP).
+#        - Approved-by    : the role/person who accepted the risk.
+#        - Date           : date accepted (UTC).
+#        - Expires        : review-by date — re-evaluate at/before this date.
+#   3. No bare CVE without the four fields. An auditor reads this file as the
+#      RA-5/SI-2 exception register.
+#   4. Prefer remediation (rebuild / base-image bump) over an exception.
+#
+# trivy also supports an inline `cve-id exp:2026-12-31` expiry suffix; we keep the
+# expiry in the comment block so grype users (.grype.yaml) follow the same format.
+#
+CVE-2026-42496
+  # Justification : perl Archive::Tar path traversal. perl-base is an Essential
+  #                 Debian package (cannot be removed from the base image).
+  #                 Nothing in nextvault (Rust binary) or postgres invokes perl
+  #                 Archive::Tar at runtime. Debian status: fix_deferred — no
+  #                 fixed package exists yet; re-check at expiry.
+  # Approved-by   : PENDING — drafted 2026-06-11, requires System Owner sign-off
+  # Date          : 2026-06-11
+  # Expires       : 2026-09-09
+
+CVE-2026-8376
+  # Justification : perl runtime CVE in the same Essential perl-base package.
+  #                 Same non-reachability as CVE-2026-42496: no perl is invoked
+  #                 at runtime by nextvault or postgres. Debian status:
+  #                 affected, no fix available; re-check at expiry.
+  # Approved-by   : PENDING — drafted 2026-06-11, requires System Owner sign-off
+  # Date          : 2026-06-11
+  # Expires       : 2026-09-09
+
+CVE-2025-68121
+  # Justification : Go stdlib CVE compiled into /usr/local/bin/gosu inside the
+  #                 upstream postgres image (still present in postgres:17.10,
+  #                 the newest 17.x). gosu runs once at container entrypoint to
+  #                 drop root->postgres, takes no untrusted input, and the DB
+  #                 container is only reachable on the internal podman network.
+  # Approved-by   : PENDING — drafted 2026-06-11, requires System Owner sign-off
+  # Date          : 2026-06-11
+  # Expires       : 2026-09-09

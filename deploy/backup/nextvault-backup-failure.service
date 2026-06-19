@@ -1,0 +1,14 @@
+# =============================================================================
+# nextvault-backup-failure.service — fired by OnFailure= of nextvault-backup.service.
+#
+# NIST CP-9 / AU-6: a backup that silently stops running is the classic failure
+# mode. This emits a high-priority journal marker that the Wazuh agent ships
+# (deploy/wazuh/local_rules.xml alerts on it), so a failed backup pages someone
+# instead of being discovered during a restore.
+# =============================================================================
+[Unit]
+Description=Vaultwarden backup FAILURE alarm (NIST CP-9/AU-6)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/logger -p user.crit -t nextvault-backup "CRITICAL: nextvault encrypted backup FAILED - run 'journalctl --user -u nextvault-backup.service' and remediate before the retention window erodes (NIST CP-9)"

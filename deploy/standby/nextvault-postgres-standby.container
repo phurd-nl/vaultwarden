@@ -1,0 +1,74 @@
+[Unit]
+Description=PostgreSQL streaming REPLICA for Vaultwarden (TLS, hot standby, NIST CP-10)
+# Read-only hot standby of nextvault-postgres. It connects to the primary over TLS
+# using primary_conninfo + a physical replication slot, continuously streaming
+# WAL so its data directory tracks the primary with seconds of lag (warm
+# standby for CP-10). It is seeded once by setup-replication.sh (pg_basebackup),
+# which writes standby.signal + the replication connection info into the replica
+# data dir. On failover, failover.sh runs pg_promote() to make this a primary.
+Requires=nextvault-standby-pgdata-volume.service nextvault-internal-network.service
+After=nextvault-standby-pgdata-volume.service nextvault-internal-network.service nextvault-postgres.service
+
+[Container]
+ContainerName=nextvault-postgres-standby
+# SAME postgres image (and digest) as the primary — replication requires the
+# major version to match. Pin by digest in production.
+Image=docker.io/library/postgres:17.10
+AutoUpdate=local
+Network=nextvault-internal.network
+# Replica is reachable ONLY on the internal network — never published.
+
+# NO POSTGRES_* bootstrap env: the data dir is NOT initdb'd here. It is seeded
+# by setup-replication.sh (pg_basebackup from the primary) into nextvault-standby-pgdata
+# BEFORE this unit is first started. The replica role's password reaches
+# postgres via the .pgpass / primary_conninfo written by that script (mounted
+# read-only below), so no cleartext password is in this unit or in env.
+Secret=vw_replication_password,type=mount,mode=0400,target=/run/secrets/vw_replication_password
+
+Volume=nextvault-standby-pgdata.volume:/var/lib/postgresql/data:Z
+# Same TLS material as the primary so the app's verify-full keeps working after
+# promotion (SAN must also cover this host; see README "TLS for the replica").
+Volume=%h/vaultwarden/tls/postgres:/etc/postgresql/tls:ro,Z
+# The CA cert the REPLICA uses to verify the PRIMARY's server cert when it
+# streams WAL (primary_conninfo sslmode=verify-full sslrootcert=...).
+Volume=%h/vaultwarden/tls/ca/internal-ca.crt:/etc/postgresql/tls/ca.crt:ro,Z
+Volume=%h/vaultwarden/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro,Z
+
+# Identical server flags to the primary so a promoted replica behaves the same.
+# hot_standby=on lets you read from the replica (e.g. monitor replay lag)
+# while it is still a standby. wal_level=replica + the replication slot let it
+# stream. primary_conninfo / standby.signal live in the seeded data dir.
+Exec=postgres \
+  -c ssl=on \
+  -c ssl_cert_file=/etc/postgresql/tls/server.crt \
+  -c ssl_key_file=/etc/postgresql/tls/server.key \
+  -c ssl_ca_file=/etc/postgresql/tls/ca.crt \
+  -c hba_file=/etc/postgresql/pg_hba.conf \
+  -c password_encryption=scram-sha-256 \
+  -c hot_standby=on \
+  -c wal_level=replica \
+  -c max_wal_senders=10 \
+  -c log_connections=on \
+  -c log_disconnections=on \
+  -c log_hostname=on \
+  -c log_line_prefix='%m [%p] %q%u@%d %r '
+
+# --- Hardening (NIST AC/SC/SI) — IDENTICAL to the primary ---
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=CHOWN DAC_OVERRIDE FOWNER SETGID SETUID
+ReadOnly=true
+Tmpfs=/tmp:rw,size=64m,mode=1777
+Tmpfs=/run:rw,size=64m
+PodmanArgs=--memory=1g --cpus=1.0 --health-cmd="pg_isready -U postgres -d vaultwarden" --health-interval=30s
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=300
+
+# --- NO [Install] SECTION ON PURPOSE ---
+# The replica is started/stopped explicitly:
+#   systemctl --user start nextvault-postgres-standby.service   # begin streaming
+# Once seeded it MAY be enabled to start at boot so replication resumes
+# automatically; leave it manual until you have validated replication, then
+# `systemctl --user enable nextvault-postgres-standby.service` if desired.

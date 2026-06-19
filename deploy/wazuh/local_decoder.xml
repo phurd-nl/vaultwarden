@@ -1,0 +1,38 @@
+<!--
+  Custom Wazuh decoders for the Vaultwarden stack.
+  Deploy to the MANAGER at /var/ossec/etc/decoders/local_decoder.xml
+  (decoding runs manager-side; see README.md).
+
+  NIST AU-3: produce the structured fields (actor, source ip, event name) that
+  the rules in local_rules.xml alert on.
+
+  NOTE on JSON: Wazuh's built-in JSON decoder (decoder "json", pre-installed)
+  already parses any log line that is a single JSON object and exposes every
+  field as a dynamic decoded field. The Vaultwarden audit lines and the Caddy
+  access lines are pure JSON, so they need NO custom decoder here — the rules
+  match the decoded fields directly (e.g. event_name, request.uri, status).
+
+  The only stream needing a custom decoder is PostgreSQL, whose lines are text.
+-->
+<decoder name="nextvault-postgres">
+  <!-- Matches the container log_line_prefix '%m [%p] %q%u@%d %r ' followed by a
+       severity keyword, e.g.:
+       2026-06-09 00:00:00 UTC [42] vaultwarden@vaultwarden 10.0.0.5(53412) FATAL: ... -->
+  <prematch>\s(LOG|FATAL|PANIC|ERROR|WARNING):</prematch>
+</decoder>
+
+<decoder name="nextvault-postgres-auth-fail">
+  <parent>nextvault-postgres</parent>
+  <!-- Pull the DB user and the message for the "password authentication failed"
+       case so rules/alerts carry who/what (NIST AU-3). -->
+  <prematch>FATAL:\s+password authentication failed for user</prematch>
+  <regex>FATAL:\s+password authentication failed for user "(\.+)"</regex>
+  <order>dstuser</order>
+</decoder>
+
+<decoder name="nextvault-postgres-no-pg_hba">
+  <parent>nextvault-postgres</parent>
+  <!-- Connection rejected by pg_hba (e.g. non-TLS attempt against hostssl).
+       Surfaces SC-8/SC-7 policy violations reaching the DB. -->
+  <prematch>FATAL:\s+(no pg_hba.conf entry|connection requires a valid client certificate|pg_hba.conf rejects)</prematch>
+</decoder>

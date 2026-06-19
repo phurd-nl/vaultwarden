@@ -1,0 +1,17 @@
+[Unit]
+Description=Periodic Vaultwarden /data sync to warm standby (NIST CP-10)
+Documentation=file://%h/vaultwarden/standby/README.md
+
+[Timer]
+# Every 5 minutes. This interval is the /data RPO ceiling when the primary is
+# lost without a final sync (attachments/sends written in the last interval may
+# be missing post-failover — see README "Consistency caveat" / RPO). Tighten
+# for a lower /data RPO at the cost of more rsync churn.
+OnBootSec=5min
+OnUnitActiveSec=5min
+# Spread runs slightly so they never align with the 03:17 backup timer.
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

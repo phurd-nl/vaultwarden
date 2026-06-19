@@ -1,0 +1,37 @@
+[Unit]
+Description=Egress allowlist proxy (Vaultwarden app -> Microsoft Entra OIDC)
+Requires=nextvault-internal-network.service nextvault-egress-network.service
+After=nextvault-internal-network.service nextvault-egress-network.service
+
+[Container]
+ContainerName=nextvault-egress-proxy
+# Minimal alpine + tinyproxy, built from this repo (NIST SR-3/CM-2: controlled
+# source). See deploy/egress-proxy/Containerfile. Pinned by immutable per-build
+# tag (short image ID) — local-only images have no registry digest.
+# Image ID: sha256:76491042fc757057b4ad427908ed8a11656b83b9e9bf7c0b2cdf8c58b0ad4d6a
+Image=localhost/nextvault-egress-proxy:76491042
+
+# On the internal network at a STATIC IP so the app can target it without DNS
+# (reqwest uses a proxy by address; the proxy resolves the upstream host). Also
+# on the egress network for the actual outbound route to Entra.
+Network=nextvault-internal.network:ip=10.89.10.200
+Network=nextvault-egress.network
+
+# Config-as-code: tinyproxy config + the FQDN allowlist are mounted, not baked,
+# so the allowlist can be reviewed/changed without rebuilding the image.
+Volume=%h/vaultwarden/egress-proxy/tinyproxy.conf:/etc/tinyproxy/tinyproxy.conf:ro,Z
+Volume=%h/vaultwarden/egress-proxy/filter:/etc/tinyproxy/filter:ro,Z
+
+# --- Hardening (NIST AC-6/SC) ---
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/run:rw,size=8m
+Tmpfs=/tmp:rw,size=8m
+PodmanArgs=--memory=64m --cpus=0.25
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

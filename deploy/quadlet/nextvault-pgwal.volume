@@ -1,0 +1,9 @@
+[Unit]
+Description=PostgreSQL WAL archive for Vaultwarden PITR (NIST CP-9/CP-10)
+
+[Volume]
+VolumeName=nextvault-pgwal
+# NIST MP/SC-28: must reside on encrypted-at-rest storage (same as nextvault-pgdata).
+
+[Install]
+WantedBy=default.target

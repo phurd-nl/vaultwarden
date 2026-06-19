@@ -1,0 +1,47 @@
+{
+	# No ACME: we terminate TLS with an internal/enterprise CA cert.
+	auto_https disable_redirects
+	admin off
+	# Don't leak the proxy version.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# NextVault production hostname; must match DOMAIN and the Caddy cert SAN.
+# Serves on 443 (requires net.ipv4.ip_unprivileged_port_start=443, see runbook 0.4).
+nextvault.nxlink.com:443 {
+	tls /etc/caddy/tls/server.crt /etc/caddy/tls/server.key
+
+	# Security headers (NIST SC). HSTS only matters once you serve on 443.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	# NIST AC: /admin is gated by the ADMIN_TOKEN (Argon2id) plus the host
+	# firewall on :443. A Caddy remote_ip allowlist canNOT work under rootless
+	# podman — rootlessport masquerades the client source IP, so Caddy never sees
+	# the real client (it sees the container-network address). Source-IP
+	# restriction is therefore enforced at the host firewall, which does see the
+	# real source. See docs/adr/0007. /admin proxies like any other path.
+	@admin path /admin /admin/*
+	handle @admin {
+		reverse_proxy 10.89.10.10:8080
+	}
+
+	# Everything else, including the WebSocket upgrade at /notifications/hub
+	# (Caddy proxies Upgrade/Connection headers transparently → HTTP 101).
+	handle {
+		reverse_proxy 10.89.10.10:8080
+	}
+
+	# Access + error logging to stdout for SIEM ingestion (NIST AU).
+	log {
+		output stdout
+		format json
+	}
+}

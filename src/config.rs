@@ -657,6 +657,30 @@ make_config! {
 
         /// Events days retain |> Number of days to retain events stored in the database. If unset, events are kept indefinitely.
         events_days_retain:     i64,    false,   option;
+
+        /// Audit logging (NIST AU)
+        /// Enable audit logging |> When enabled, emit a single-line JSON audit record to the application log for every security event routed through the event choke points (NIST AU-2/AU-3/AU-12). Independent of org event logging.
+        audit_log_enabled:      bool,   false,   def,    false;
+
+        /// Account lockout (NIST AC-7)
+        /// Enable account lockout |> When enabled, lock an account after too many consecutive failed password logins, auto-unlocking after a cooldown (NIST AC-7). Off by default to preserve current behavior.
+        account_lockout_enabled:        bool,   false,   def,    false;
+        /// Max failed attempts |> Number of consecutive failed password logins before the account is temporarily locked.
+        account_lockout_max_attempts:   i32,    false,   def,    5;
+        /// Lockout cooldown (seconds) |> How long an account stays locked after reaching the failed-attempt threshold, before it auto-unlocks.
+        account_lockout_cooldown_seconds: i64,  false,   def,    900;
+
+        /// Login banner (NIST AC-8)
+        /// System-use notification |> Optional banner text shown to users at/around authentication (NIST AC-8 system-use notification). When set, it is surfaced in the client config endpoint as "loginBanner" and rendered above the /admin login form. Unset/empty by default to preserve current behavior.
+        login_banner:           String, true,    option;
+
+        /// Session timeout (NIST AC-11 / AC-12)
+        /// Refresh-token lifetime (days) |> Absolute lifetime of a non-mobile session's refresh token, in days. This is the effective session-termination horizon (NIST AC-12). Defaults to the historical 30 days so behavior is unchanged unless an operator opts in.
+        session_refresh_validity_days:          i64,    false,  def,    30;
+        /// Mobile refresh-token lifetime (days) |> Absolute lifetime of a mobile session's refresh token, in days (NIST AC-12). Defaults to the historical 90 days so behavior is unchanged unless an operator opts in.
+        session_mobile_refresh_validity_days:   i64,    false,  def,    90;
+        /// Idle timeout (minutes) |> When set, a session whose device has not been used within this many minutes is forced to re-login on the next token refresh (NIST AC-11 idle/session lock). Unset (the default) leaves idle timeout OFF, preserving current behavior.
+        session_idle_timeout_minutes:           i64,    false,  option;
     },
 
     /// Advanced settings
@@ -829,6 +853,12 @@ make_config! {
         sso_client_cache_expiration:    u64,    true,   def,    0;
         /// Log all tokens |> `LOG_LEVEL=debug` or `LOG_LEVEL=info,vaultwarden::sso=debug` is required
         sso_debug_tokens:               bool,   true,   def,    false;
+        /// Default organization for SSO auto-enrollment |> When set to an organization UUID, every SSO login ensures the user is a member of that organization (role User, in Accepted state pending admin confirmation). Empty disables auto-enrollment.
+        sso_default_org:                String, true,   def,    String::new();
+        /// Sync department collections from SSO |> When enabled, each SSO login reconciles the user's access to "department vault" collections (collections tagged with a plaintext external_id) in the default org against their department claim: grants the matching collection, revokes other department collections. Requires SSO_DEFAULT_ORG.
+        sso_sync_department_collections: bool,  true,   def,    false;
+        /// SSO department claim name |> Name of the id_token claim that carries the user's department (matched case-insensitively against each department collection's external_id). For Microsoft Entra ID add `department` as an optional claim.
+        sso_department_claim:           String, true,   def,    "department".to_owned();
     },
 
     /// Yubikey settings

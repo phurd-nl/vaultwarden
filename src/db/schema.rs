@@ -217,6 +217,9 @@ table! {
         api_key -> Nullable<Text>,
         avatar_color -> Nullable<Text>,
         external_id -> Nullable<Text>,
+        // NIST AC-7 account lockout (additive, see docs/adr/0003).
+        failed_login_count -> Integer,
+        locked_until -> Nullable<Timestamp>,
     }
 }
 

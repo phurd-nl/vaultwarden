@@ -1,0 +1,62 @@
+[Unit]
+Description=Vaultwarden WARM STANDBY app instance (NIST CP-10, manual failover)
+# Identical hardened config to the primary `nextvault.container`, but this
+# instance is NOT part of the normal dependency chain and is NOT in Caddy's
+# upstream until a failover. It exists so that, on primary loss, a known-good
+# app container can be started in seconds against the (promoted) database.
+#
+# It requires the same internal network + a CONSISTENT /data (see data-sync.sh
+# and the consistency caveat in README.md). It deliberately depends on NOTHING
+# that would auto-start it: no Requires on nextvault-caddy, no [Install] WantedBy.
+Requires=nextvault-standby-data-volume.service nextvault-internal-network.service
+After=nextvault-standby-data-volume.service nextvault-internal-network.service
+
+[Container]
+ContainerName=nextvault-standby
+# SAME image (and digest) as the primary — config-as-code, no drift (CM-2/SR).
+# Pin by digest in production (localhost/nextvault@sha256:...).
+Image=localhost/nextvault:latest
+AutoUpdate=local
+Network=nextvault-internal.network
+
+# SAME non-secret configuration as the primary (NIST CM). The standby reads the
+# exact same env file so the two instances are byte-identical in behaviour.
+EnvironmentFile=%h/vaultwarden/config/vaultwarden.env
+
+# Secrets: the admin token is identical to the primary. The DATABASE_URL is a
+# DISTINCT secret (vw_database_url_standby) so failover can repoint the DB host
+# without touching the primary's secret. Before failover it points at the
+# read replica's host (nextvault-postgres-standby); failover.sh confirms the replica is
+# promoted (read/write) before the standby app is started against it.
+Secret=vw_admin_token,type=mount,target=/run/secrets/vw_admin_token,mode=0400
+Secret=vw_database_url_standby,type=mount,target=/run/secrets/vw_database_url,mode=0400
+# Native <KEY>_FILE support reads the secret from the file path (no shim).
+Environment=ADMIN_TOKEN_FILE=/run/secrets/vw_admin_token
+Environment=DATABASE_URL_FILE=/run/secrets/vw_database_url
+
+# DISTINCT /data volume kept consistent from the primary by data-sync.sh.
+# On a single host this is nextvault-standby-data; on a two-host topology this is the
+# rsync target on the standby host. See README "/data replication".
+Volume=nextvault-standby-data.volume:/data:Z
+# Internal CA cert so the app validates the PostgreSQL server cert (verify-full).
+Volume=%h/vaultwarden/tls/ca/internal-ca.crt:/etc/ssl/certs/internal-ca.crt:ro,Z
+
+# --- Hardening (NIST AC-6/SC) — IDENTICAL to the primary ---
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp:rw,size=64m
+PodmanArgs=--memory=512m --cpus=1.0
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=120
+
+# --- NO [Install] SECTION ON PURPOSE (NIST CP-10, manual failover) ---
+# Without [Install]/WantedBy this unit is never pulled up at boot or by the
+# Caddy dependency chain. It is started ONLY by failover.sh (or by hand):
+#   systemctl --user start nextvault-standby.service
+# and stopped by failback.sh:
+#   systemctl --user stop  nextvault-standby.service
+# Keeping it out of default.target is what makes this active-PASSIVE: there is
+# never more than one app instance writing to the live database.

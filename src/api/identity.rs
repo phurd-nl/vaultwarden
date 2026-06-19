@@ -339,10 +339,43 @@ async fn sso_login(
     // Set the user_uuid here to be passed back used for event logging.
     *user_id = Some(user.uuid.clone());
 
+    // NIST AC-2: drop SSO-authenticated users into the configured default org
+    // (best-effort; never aborts login). See src/sso_enroll.rs.
+    crate::sso_enroll::ensure_default_org_membership(&user, conn).await;
+
+    // NIST AC-2/AC-6: reconcile department-vault collection access from the
+    // SSO department claim (best-effort; never aborts login). See src/sso_dept.rs.
+    crate::sso_dept::sync_department_access(&user.uuid, user_infos.department.as_deref(), conn).await;
+
     // We passed 2FA get auth tokens
     let auth_tokens = sso::redeem(&device, &user, data.client_id, sso_user, sso_auth, user_infos, conn).await?;
 
     authenticated_response(&user, &mut device, auth_tokens, twofactor_token, conn, ip).await
+}
+
+/// NIST AC-7: record a failed login attempt and lock the account once the
+/// configured threshold is crossed. Shared by the password and auth-request
+/// failure paths. No-op when lockout is disabled.
+async fn record_failed_login_attempt(user: &mut User, ip: &ClientIp, conn: &DbConn) {
+    let enabled = CONFIG.account_lockout_enabled();
+    if !enabled {
+        return;
+    }
+    let decision = crate::audit::lockout::decide_after_failure(
+        enabled,
+        user.failed_login_count,
+        CONFIG.account_lockout_max_attempts(),
+        CONFIG.account_lockout_cooldown_seconds(),
+        Utc::now().naive_utc(),
+    );
+    user.failed_login_count = decision.new_failed_count;
+    user.locked_until = decision.new_locked_until;
+    if let Err(e) = user.save(conn).await {
+        error!("Error updating user lockout state: {e:#?}");
+    }
+    if decision.should_lock {
+        crate::audit::emit_named("user.locked", Some(&user.uuid), Some(&ip.ip.to_string()));
+    }
 }
 
 async fn password_login(
@@ -378,6 +411,23 @@ async fn password_login(
         )
     }
 
+    // NIST AC-7: reject login while the account is in a lockout cooldown,
+    // before verifying the password or issuing any token.
+    if crate::audit::lockout::is_currently_locked(
+        CONFIG.account_lockout_enabled(),
+        user.locked_until,
+        Utc::now().naive_utc(),
+    ) {
+        crate::audit::emit_named("user.login.locked", Some(&user.uuid), Some(&ip.ip.to_string()));
+        err!(
+            "Account is temporarily locked. Try again later.",
+            format!("IP: {}. Username: {username}.", ip.ip),
+            ErrorEvent {
+                event: EventType::UserFailedLogIn
+            }
+        )
+    }
+
     let password = data.password.as_ref().unwrap();
 
     // If we get an auth request, we don't check the user's password, but the access code of the auth request
@@ -401,6 +451,8 @@ async fn password_login(
             || ip.ip.to_string() != auth_request.request_ip
             || !auth_request.check_access_code(password)
         {
+            // NIST AC-7: a bad access code is a failed authentication too.
+            record_failed_login_attempt(&mut user, ip, conn).await;
             err!(
                 "Username or access code is incorrect. Try again",
                 format!("IP: {}. Username: {username}.", ip.ip),
@@ -410,6 +462,8 @@ async fn password_login(
             )
         }
     } else if !user.check_valid_password(password) {
+        // NIST AC-7: record the failed attempt and lock the account if needed.
+        record_failed_login_attempt(&mut user, ip, conn).await;
         err!(
             "Username or password is incorrect. Try again",
             format!("IP: {}. Username: {username}.", ip.ip),
@@ -417,6 +471,16 @@ async fn password_login(
                 event: EventType::UserFailedLogIn,
             }
         )
+    }
+
+    // NIST AC-7: on a successful credential check, clear any accumulated
+    // failed-attempt state so the next failure series starts fresh.
+    if user.failed_login_count > 0 || user.locked_until.is_some() {
+        user.failed_login_count = 0;
+        user.locked_until = None;
+        if let Err(e) = user.save(conn).await {
+            error!("Error resetting user lockout state: {e:#?}");
+        }
     }
 
     // Change the KDF Iterations (only when not logging in with an auth request)

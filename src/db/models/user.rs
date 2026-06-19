@@ -69,6 +69,10 @@ pub struct User {
     pub avatar_color: Option<String>,
 
     pub external_id: Option<String>, // Todo: Needs to be removed in the future, this is not used anymore.
+
+    // NIST AC-7 account lockout (additive, see docs/adr/0003).
+    pub failed_login_count: i32,
+    pub locked_until: Option<NaiveDateTime>,
 }
 
 #[derive(Identifiable, Queryable, Insertable)]
@@ -154,6 +158,10 @@ impl User {
             avatar_color: None,
 
             external_id: None, // Todo: Needs to be removed in the future, this is not used anymore.
+
+            // NIST AC-7 account lockout (additive, see docs/adr/0003).
+            failed_login_count: 0,
+            locked_until: None,
         }
     }
 

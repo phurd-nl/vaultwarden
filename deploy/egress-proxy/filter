@@ -1,0 +1,9 @@
+# Egress FQDN allowlist for the Vaultwarden -> Entra OIDC path (default-deny).
+# POSIX extended regex, matched against the request/CONNECT host (case-insensitive).
+# Keep this list as tight as possible — every entry is a permitted egress target.
+
+# Entra OIDC: discovery, JWKS, authorize, and token endpoints all live here.
+^login\.microsoftonline\.com$
+
+# Entra OIDC userinfo endpoint (used on some validation/session paths).
+^graph\.microsoft\.com$

@@ -1,0 +1,14 @@
+[Unit]
+Description=Vaultwarden WARM STANDBY /data (rsync target of nextvault-data; attachments, sends, rsa keys)
+
+[Volume]
+VolumeName=nextvault-standby-data
+# Kept consistent from the primary nextvault-data volume by data-sync.sh on a schedule.
+# NIST MP/SC-28: must reside on encrypted-at-rest storage, exactly like nextvault-data
+# (see deploy/README.md). On a two-host topology this volume lives on the
+# STANDBY host and data-sync.sh rsyncs into it over SSH; on a single host it is
+# a second local volume. CP-10: this is the failover copy of /data — see the
+# consistency caveat in deploy/standby/README.md.
+
+[Install]
+WantedBy=default.target

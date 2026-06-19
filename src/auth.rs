@@ -1223,10 +1223,17 @@ impl AuthTokens {
 
         let access_claims = LoginJwtClaims::default(device, user, &sub, client_id);
 
+        // NIST AC-12: absolute refresh-token lifetime is operator-configurable.
+        // Defaults equal the historical 30/90-day consts, which remain the fallback
+        // if the configured value is non-positive or overflows.
         let validity = if device.is_mobile() {
-            *MOBILE_REFRESH_VALIDITY
+            TimeDelta::try_days(CONFIG.session_mobile_refresh_validity_days())
+                .filter(|d| *d > TimeDelta::zero())
+                .unwrap_or(*MOBILE_REFRESH_VALIDITY)
         } else {
-            *DEFAULT_REFRESH_VALIDITY
+            TimeDelta::try_days(CONFIG.session_refresh_validity_days())
+                .filter(|d| *d > TimeDelta::zero())
+                .unwrap_or(*DEFAULT_REFRESH_VALIDITY)
         };
 
         let refresh_claims = RefreshJwtClaims {
@@ -1275,6 +1282,14 @@ pub async fn refresh_tokens(
     let Some(mut device) = Device::find_by_refresh_token(&refresh_claims.device_token, conn).await else {
         err!("Invalid refresh token")
     };
+
+    // NIST AC-11: optional idle timeout. Capture the prior last-use timestamp BEFORE
+    // the save below resets `updated_at` to now. Unset config => idle timeout OFF.
+    let last_used = device.updated_at;
+    if crate::nist_session::idle_expired(last_used, CONFIG.session_idle_timeout_minutes(), Utc::now().naive_utc()) {
+        crate::audit::emit_named("user.session.idle_timeout", Some(&device.user_uuid), Some(&ip.ip.to_string()));
+        err!("Session idle timeout reached, please log in again");
+    }
 
     // Save to update `updated_at`.
     device.save(true, conn).await?;

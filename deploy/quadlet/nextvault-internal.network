@@ -1,0 +1,16 @@
+[Unit]
+Description=Vaultwarden internal network (app <-> database <-> proxy backend)
+
+[Network]
+NetworkName=nextvault-internal
+# Internal=true => no external egress and no host port mapping on this network.
+# Satisfies NIST SC egress restriction: the app and database cannot reach the
+# internet. External fetches (icons, HIBP) are disabled in vaultwarden.env so
+# this does not break functionality. SMTP/push, if ever approved, would require
+# attaching the app to an egress-capable network with an allowlist instead.
+Internal=true
+Subnet=10.89.10.0/24
+Gateway=10.89.10.1
+
+[Install]
+WantedBy=default.target

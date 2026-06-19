@@ -1,0 +1,15 @@
+[Unit]
+Description=Vaultwarden /data sync to warm standby (NIST CP-10)
+Documentation=file://%h/vaultwarden/standby/README.md
+# Best-effort; do not fail the timer chain if the standby host is briefly down —
+# the next run catches up. Replication lag is monitored separately.
+After=network-online.target
+
+[Service]
+Type=oneshot
+# EDIT MODE for your topology (twohost|shared|local) and the STANDBY_SSH/PATH.
+Environment=MODE=twohost
+ExecStart=%h/vaultwarden/standby/data-sync.sh
+# Read-only against nextvault-data; never blocks the live app.
+Nice=10
+IOSchedulingClass=idle

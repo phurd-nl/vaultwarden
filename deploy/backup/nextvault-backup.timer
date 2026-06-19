@@ -1,0 +1,27 @@
+# =============================================================================
+# nextvault-backup.timer — schedules nextvault-backup.service daily at an off-peak,
+# deliberately non-:00 minute.
+#
+# NIST 800-53B Moderate: CP-9 (backups occur on a defined, automated schedule).
+#
+# Plain systemd USER timer (quadlets can't do timers). Install under
+# ~/.config/systemd/user/ and enable with --user — see README "Scheduling".
+# Requires `loginctl enable-linger $USER` so the timer fires while logged out.
+# =============================================================================
+[Unit]
+Description=Daily Vaultwarden encrypted backup (NIST CP-9)
+Documentation=file:%h/vaultwarden/deploy/backup/README.md
+
+[Timer]
+# 03:17 local time daily — off-peak and intentionally NOT on the :00 minute, so
+# this host doesn't stampede a shared backup target / NFS at the top of the hour.
+OnCalendar=*-*-* 03:17:00
+# If the machine was off at 03:17, run as soon as it's back (don't skip a day).
+Persistent=true
+# Spread load if many hosts share this unit: jitter up to 5 minutes.
+RandomizedDelaySec=300
+AccuracySec=1min
+Unit=nextvault-backup.service
+
+[Install]
+WantedBy=timers.target

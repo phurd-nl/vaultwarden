@@ -1,0 +1,44 @@
+[Unit]
+Description=Caddy reverse proxy / TLS termination for Vaultwarden
+Requires=nextvault-edge-network.service nextvault-internal-network.service nextvault.service
+After=nextvault-edge-network.service nextvault-internal-network.service nextvault.service
+
+[Container]
+ContainerName=nextvault-caddy
+# Explicit journald driver (CM-6) so the Wazuh agent's journald reader sees this
+# stream (deploy/wazuh/README.md). Podman rootless defaults to journald anyway.
+LogDriver=journald
+# NIST CM-2/SR: pin by digest in production.
+Image=docker.io/library/caddy@sha256:4679412ccd2114dca9f3017e2c460f76c9d8eb9e1850e72fb9ecda672e05c629
+# Caddy is the ONLY container on both networks: edge (ingress) + internal (to app).
+Network=nextvault-edge.network
+Network=nextvault-internal.network
+
+# Serves on 443. The host->container publish requires
+# net.ipv4.ip_unprivileged_port_start=443 (see VM-BRINGUP.md step 0.4). Caddy
+# listens on 443 inside the container too (Caddyfile site address), which needs
+# CAP_NET_BIND_SERVICE (added below).
+PublishPort=443:443
+
+Volume=%h/vaultwarden/caddy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+Volume=nextvault-caddy-data.volume:/data:Z
+# TLS server cert/key issued by your internal/enterprise CA (SAN = your DOMAIN).
+Volume=%h/vaultwarden/tls/caddy:/etc/caddy/tls:ro,Z
+
+# --- Hardening ---
+NoNewPrivileges=true
+DropCapability=ALL
+# The caddy binary ships with a cap_net_bind_service file-capability; under
+# NoNewPrivileges + cap-drop=all the kernel refuses to execve it ("Operation
+# not permitted") unless that cap is in the bounding set. Add back exactly that
+# one cap — it also lets caddy bind :443 inside the container netns.
+AddCapability=NET_BIND_SERVICE
+ReadOnly=true
+Tmpfs=/tmp:rw,size=32m
+PodmanArgs=--memory=256m --cpus=0.5
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

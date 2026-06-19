@@ -35,6 +35,11 @@ pub struct OIDCAuthenticatedUser {
     pub email: String,
     pub email_verified: Option<bool>,
     pub user_name: Option<String>,
+    // Department claim extracted from the id_token (for SSO department-collection
+    // sync). `serde(default)` keeps deserialization of pre-existing persisted rows
+    // working when this field is absent.
+    #[serde(default)]
+    pub department: Option<String>,
 }
 
 impl_FromToSqlText!(OIDCAuthenticatedUser);
