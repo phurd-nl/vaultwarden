@@ -18,8 +18,8 @@ LogDriver=journald
 # image has no registry digest, so @sha256 pinning can't work; each deploy
 # retags the new build and updates this line deliberately. AutoUpdate was
 # removed for the same reason — updates must be explicit quadlet edits.
-# Image ID: sha256:7663db26c0de6a7fa322848d38ae7918cd3ad8160f7afaf8e08769d4ec3c829f
-Image=localhost/nextvault:aurora-sso-dept
+# Image ID: sha256:d431cd660da3e629972ca536096927f563be6711b0fb249e02541b37cd90a973
+Image=localhost/nextvault:sso-dept-alias
 # Static internal IP. The container name "nextvault" collides with the VM
 # hostname (host /etc/hosts maps 127.0.1.1 nextvault, which podman copies into
 # every container and shadows aardvark-DNS), so Caddy must target the app by IP,
